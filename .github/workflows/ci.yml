@@ -1,0 +1,60 @@
+name: Windows Release
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Release ${{ matrix.arch }}
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: cmd
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86
+            preset: win32
+          - arch: x64
+            preset: x64
+          - arch: ARM64
+            preset: arm64
+    steps:
+      - name: Checkout proyecto
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Checkout SDK oficial fijado
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: notepad-plus-plus/notepad-plus-plus
+          ref: dd40fe45598791e9aa38f3aeb200e10fb3d6338a
+          path: .build/notepad-plus-plus
+          persist-credentials: false
+      - name: Herramientas de build fijadas
+        run: python -m pip install --disable-pip-version-check cmake==3.31.6
+      - name: Pruebas del empaquetador
+        run: python -m unittest discover -s tests -p test_*.py -v
+      - name: Build Release y contratos ABI con script compartido
+        run: python scripts/build_matrix.py --arch ${{ matrix.arch }} --cmake cmake --test
+      - name: Crear ZIP oficial y registrar SHA-256
+        run: python scripts/package_plugin.py --arch ${{ matrix.arch }} --dll .build/${{ matrix.preset }}/Release/NppLdapFormatter.dll --output-dir .build/packages/${{ matrix.arch }}
+      - name: Verificar ZIP y SHA-256 con script compartido
+        run: python scripts/validate_packages.py --arch ${{ matrix.arch }} --packages-dir .build/packages/${{ matrix.arch }} --dll .build/${{ matrix.preset }}/Release/NppLdapFormatter.dll
+      - name: Subir ZIP y checksum por arquitectura
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: NppLdapFormatter-${{ matrix.arch }}-Release
+          path: |
+            .build/packages/${{ matrix.arch }}/*.zip
+            .build/packages/${{ matrix.arch }}/*.sha256
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14

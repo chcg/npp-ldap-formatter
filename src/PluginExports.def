@@ -1,0 +1,8 @@
+LIBRARY NppLdapFormatter
+EXPORTS
+    isUnicode
+    setInfo
+    getName
+    getFuncsArray
+    beNotified
+    messageProc

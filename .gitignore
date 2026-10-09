@@ -1,0 +1,23 @@
+# Build artifacts
+.build/
+build*/
+*.dll
+*.exe
+*.lib
+*.exp
+*.pdb
+*.obj
+*.zip
+
+# Tooling and VS caches
+.vs/
+CMakeCache.txt
+CMakeFiles/
+
+# BMad ephemeral render cache
+_bmad/render/
+__pycache__/
+.agents/
+_bmad/
+_bmad-output/
+*.pyc
