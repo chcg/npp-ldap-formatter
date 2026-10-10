@@ -13,6 +13,10 @@ enum class LdapErrorCode {
     InvalidAttribute,
     InvalidEscape,
     UnsupportedFilter,
+    EmptyGroup,
+    InvalidGroupArity,
+    UnbalancedParenthesis,
+    DepthExceeded,
     RawNul,
     ResourceFailure,
     InternalFailure,
@@ -31,10 +35,34 @@ struct ParseResult {
     [[nodiscard]] bool ok() const noexcept { return !error.has_value(); }
 };
 
+enum class OutputMode { Pretty, Compact };
+enum class Eol { CrLf, Lf, Cr };
+
+struct FormatOptions {
+    OutputMode mode{OutputMode::Pretty};
+    Eol eol{Eol::CrLf};
+};
+
+struct FormatResult {
+    std::string text{};
+    std::optional<ParseError> error{};
+
+    [[nodiscard]] bool ok() const noexcept { return !error.has_value(); }
+};
+
 // Acepta únicamente (attr=value) RFC 4515, sin espacios fuera de la hoja.
 // Compact copia literalmente atributo, escapes y cada byte del valor.
 // Valida UTF-8 de toda la entrada antes de reportar errores sintácticos.
 // No lanza excepciones a través del contrato; fallos de recursos son tipados.
 [[nodiscard]] ParseResult parseSimpleEquality(std::string_view input) noexcept;
+
+// Analiza grupos AND/OR/NOT y hojas de igualdad con pila explícita.
+// Cuenta la raíz: acepta hasta 128 filtros abiertos y rechaza el siguiente '('.
+// La entrada permite SP/HTAB/CR/LF solo entre nodos, en ambos modos de salida;
+// no admite espacios fuera de la raíz. Compact elimina solo esos separadores.
+// UTF-8 de toda la entrada se valida antes de diagnosticar la estructura.
+// Ambos modos preservan cada byte de las hojas. No devuelve salida parcial ni lanza.
+[[nodiscard]] FormatResult formatFilter(
+    std::string_view input, FormatOptions options = {}) noexcept;
 
 } // namespace ldap

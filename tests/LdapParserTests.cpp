@@ -32,6 +32,37 @@ void invalid(std::string_view input, ldap::LdapErrorCode code, std::size_t offse
         ++failures;
     }
 }
+
+void formatted(std::string_view input, ldap::FormatOptions options, std::string_view expected) {
+    const auto result{ldap::formatFilter(input, options)};
+    if (!result.ok() || result.text != expected) {
+        std::cerr << "Structural formatter changed expected bytes\n";
+        ++failures;
+        return;
+    }
+    const auto repeated{ldap::formatFilter(result.text, options)};
+    if (!repeated.ok() || repeated.text != expected) {
+        std::cerr << "Structural formatter is not idempotent\n";
+        ++failures;
+    }
+}
+
+void formatInvalid(std::string_view input, ldap::LdapErrorCode code, std::size_t offset) {
+    const auto result{ldap::formatFilter(input)};
+    if (result.ok() || !result.text.empty() || result.error->code != code
+        || result.error->offset != offset) {
+        std::cerr << "Wrong structural error code/offset or partial output\n";
+        ++failures;
+    }
+}
+
+std::string nestedNot(std::size_t levels) {
+    std::string input{};
+    for (std::size_t i{1}; i < levels; ++i) { input.append("(!"); }
+    input.append("(cn=x)");
+    for (std::size_t i{1}; i < levels; ++i) { input.push_back(')'); }
+    return input;
+}
 } // namespace
 
 int main() {
@@ -104,6 +135,58 @@ int main() {
     invalid(std::string{"(cn=\xF0\x9F\x98"}, LdapErrorCode::InvalidUtf8, 4);
     // UTF-8 prevalece sobre el error sintáctico anterior de falta de '('.
     invalid(std::string{"bad=\xC0"}, LdapErrorCode::InvalidUtf8, 4);
+
+    const ldap::FormatOptions compact{ldap::OutputMode::Compact, ldap::Eol::CrLf};
+    const ldap::FormatOptions prettyCrLf{ldap::OutputMode::Pretty, ldap::Eol::CrLf};
+    const ldap::FormatOptions prettyLf{ldap::OutputMode::Pretty, ldap::Eol::Lf};
+    const ldap::FormatOptions prettyCr{ldap::OutputMode::Pretty, ldap::Eol::Cr};
+    const std::string_view group{"(&(cn=John Doe)(|(sn=\\28x\\29)(uid=a)))"};
+    formatted(group, compact, group);
+    formatted(group, prettyCrLf,
+        "(&\r\n  (cn=John Doe)\r\n  (|\r\n    (sn=\\28x\\29)\r\n    (uid=a)\r\n  )\r\n)");
+    formatted(group, prettyLf,
+        "(&\n  (cn=John Doe)\n  (|\n    (sn=\\28x\\29)\n    (uid=a)\n  )\n)");
+    formatted("(!(cn=\\2A\\5C\\00))", compact, "(!(cn=\\2A\\5C\\00))");
+    formatted("(!(cn= a  b ))", prettyCr, "(!\r  (cn= a  b )\r)");
+    formatted("(& \t\n (cn= John  Doe )\r\n (sn=\\2A)\t)", compact,
+        "(&(cn= John  Doe )(sn=\\2A))");
+    formatted("(& \t\n (cn= John  Doe )\r\n (sn=\\2A)\t)", prettyLf,
+        "(&\n  (cn= John  Doe )\n  (sn=\\2A)\n)");
+    formatted("(cn= John  Doe )", prettyLf, "(cn= John  Doe )");
+    const auto defaultPretty{ldap::formatFilter("(&(cn=a)(sn=b))")};
+    if (!defaultPretty.ok() || defaultPretty.text != "(&\r\n  (cn=a)\r\n  (sn=b)\r\n)") {
+        std::cerr << "Default mode must be Pretty with CRLF\n";
+        ++failures;
+    }
+
+    formatInvalid("(&)", LdapErrorCode::EmptyGroup, 2);
+    formatInvalid("(|   )", LdapErrorCode::EmptyGroup, 5);
+    formatInvalid("(!)", LdapErrorCode::EmptyGroup, 2);
+    formatInvalid("(!(cn=a)(sn=b))", LdapErrorCode::InvalidGroupArity, 8);
+    formatInvalid("(&(cn=a)", LdapErrorCode::UnbalancedParenthesis, 8);
+    formatInvalid("(&(cn=a", LdapErrorCode::UnbalancedParenthesis, 7);
+    formatInvalid("(&(cn=a)))", LdapErrorCode::UnbalancedParenthesis, 9);
+    formatInvalid("(&(cn=*))", LdapErrorCode::UnsupportedFilter, 6);
+    formatInvalid("(&(cn_name=a))", LdapErrorCode::InvalidAttribute, 5);
+    formatInvalid("(&(cn=\\GG))", LdapErrorCode::InvalidEscape, 6);
+    formatInvalid(std::string{"(&(cn=a\0b))", 11}, LdapErrorCode::RawNul, 7);
+    formatInvalid(" (cn=a)", LdapErrorCode::InvalidSyntax, 0);
+    formatInvalid("(cn=a) ", LdapErrorCode::InvalidSyntax, 6);
+    formatInvalid(std::string{"bad=\xC0"}, LdapErrorCode::InvalidUtf8, 4);
+
+    formatted(nestedNot(5), compact, nestedNot(5));
+    const auto maxDepth{nestedNot(128)};
+    formatted(maxDepth, compact, maxDepth);
+    const auto maxPretty{ldap::formatFilter(maxDepth, prettyLf)};
+    if (!maxPretty.ok()) {
+        std::cerr << "Pretty rejected 128 filter levels\n";
+        ++failures;
+    } else {
+        formatted(maxPretty.text, prettyLf, maxPretty.text);
+        formatted(maxPretty.text, compact, maxDepth);
+    }
+    const auto tooDeep{nestedNot(129)};
+    formatInvalid(tooDeep, LdapErrorCode::DepthExceeded, 2 * 128);
 
     if (failures != 0) { return EXIT_FAILURE; }
     std::cout << "LDAP simple equality: all cases passed\n";

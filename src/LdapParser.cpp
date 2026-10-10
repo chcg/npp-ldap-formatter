@@ -1,7 +1,9 @@
 #include "LdapParser.hpp"
 
+#include <array>
 #include <new>
 #include <stdexcept>
+#include <vector>
 
 namespace ldap {
 namespace {
@@ -99,6 +101,49 @@ namespace {
     return std::nullopt;
 }
 
+struct LeafResult {
+    std::size_t next{};
+    std::optional<ParseError> error{};
+};
+
+[[nodiscard]] LeafResult scanLeaf(std::string_view input, std::size_t open) noexcept {
+    std::size_t equals{open + 1};
+    while (equals < input.size() && input[equals] != '=') {
+        const auto ch{input[equals]};
+        if (ch == '>' || ch == '<' || ch == '~' || ch == ':') {
+            return {0, ParseError{LdapErrorCode::UnsupportedFilter, equals}};
+        }
+        if (ch == ')' || ch == '(') {
+            return {0, ParseError{LdapErrorCode::InvalidSyntax, equals}};
+        }
+        ++equals;
+    }
+    if (equals == input.size()) {
+        return {0, ParseError{LdapErrorCode::InvalidSyntax, equals}};
+    }
+    if (const auto bad{validateAttribute(input, open + 1, equals)}; bad.has_value()) {
+        return {0, ParseError{LdapErrorCode::InvalidAttribute, *bad}};
+    }
+
+    for (std::size_t i{equals + 1}; i < input.size(); ++i) {
+        const auto ch{static_cast<unsigned char>(input[i])};
+        if (ch == ')') {
+            return {i + 1, std::nullopt};
+        }
+        if (ch == '(') { return {0, ParseError{LdapErrorCode::InvalidSyntax, i}}; }
+        if (ch == '*') { return {0, ParseError{LdapErrorCode::UnsupportedFilter, i}}; }
+        if (ch == 0) { return {0, ParseError{LdapErrorCode::RawNul, i}}; }
+        if (ch == '\\') {
+            if (input.size() - i <= 2 || !asciiHex(static_cast<unsigned char>(input[i + 1]))
+                || !asciiHex(static_cast<unsigned char>(input[i + 2]))) {
+                return {0, ParseError{LdapErrorCode::InvalidEscape, i}};
+            }
+            i += 2;
+        }
+    }
+    return {0, ParseError{LdapErrorCode::UnbalancedParenthesis, input.size()}};
+}
+
 [[nodiscard]] ParseResult parseValidated(std::string_view input) {
     if (input.empty() || input.front() != '(') {
         return fail(LdapErrorCode::InvalidSyntax, 0);
@@ -108,44 +153,139 @@ namespace {
     if (first == '&' || first == '|' || first == '!') {
         return fail(LdapErrorCode::UnsupportedFilter, 1);
     }
+    const auto leaf{scanLeaf(input, 0)};
+    if (leaf.error.has_value()) {
+        // El tracer 2.1 conserva su diagnóstico histórico para cierre ausente.
+        const auto code{leaf.error->code == LdapErrorCode::UnbalancedParenthesis
+            ? LdapErrorCode::InvalidSyntax : leaf.error->code};
+        return fail(code, leaf.error->offset);
+    }
+    if (leaf.next != input.size()) {
+        return fail(LdapErrorCode::InvalidSyntax, leaf.next);
+    }
+    return ParseResult{std::string{input}, std::nullopt};
+}
 
-    std::size_t equals{1};
-    while (equals < input.size() && input[equals] != '=') {
-        const auto ch{input[equals]};
-        if (ch == '>' || ch == '<' || ch == '~' || ch == ':') {
-            return fail(LdapErrorCode::UnsupportedFilter, equals);
-        }
-        if (ch == ')' || ch == '(') {
-            return fail(LdapErrorCode::InvalidSyntax, equals);
-        }
-        ++equals;
-    }
-    if (equals == input.size()) { return fail(LdapErrorCode::InvalidSyntax, equals); }
-    if (const auto bad{validateAttribute(input, 1, equals)}; bad.has_value()) {
-        return fail(LdapErrorCode::InvalidAttribute, *bad);
-    }
+enum class EventKind { Open, Leaf, Close };
+struct Event {
+    EventKind kind{};
+    std::size_t begin{};
+    std::size_t end{};
+    char op{};
+};
 
-    for (std::size_t i{equals + 1}; i < input.size(); ++i) {
-        const auto ch{static_cast<unsigned char>(input[i])};
-        if (ch == ')') {
-            if (i + 1 != input.size()) {
-                return fail(LdapErrorCode::InvalidSyntax, i + 1);
-            }
-            // En la hoja simple no hay whitespace estructural válido.
-            return ParseResult{std::string{input}, std::nullopt};
+struct Frame {
+    char op{};
+    std::size_t children{};
+};
+
+[[nodiscard]] constexpr bool structuralSpace(char ch) noexcept {
+    return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
+}
+
+[[nodiscard]] FormatResult formatFail(LdapErrorCode code, std::size_t offset) noexcept {
+    return FormatResult{{}, ParseError{code, offset}};
+}
+
+[[nodiscard]] std::optional<ParseError> scanStructure(
+    std::string_view input, std::vector<Event>& events) {
+    enum class State { NeedFilter, NeedChild, AfterChild, Done };
+    std::array<Frame, 128> stack{};
+    std::size_t depth{};
+    std::size_t cursor{};
+    State state{State::NeedFilter};
+
+    while (true) {
+        if (state == State::Done) {
+            if (cursor == input.size()) { return std::nullopt; }
+            return ParseError{input[cursor] == ')' ? LdapErrorCode::UnbalancedParenthesis
+                                                     : LdapErrorCode::InvalidSyntax, cursor};
         }
-        if (ch == '(') { return fail(LdapErrorCode::InvalidSyntax, i); }
-        if (ch == '*') { return fail(LdapErrorCode::UnsupportedFilter, i); }
-        if (ch == 0) { return fail(LdapErrorCode::RawNul, i); }
-        if (ch == '\\') {
-            if (input.size() - i <= 2 || !asciiHex(static_cast<unsigned char>(input[i + 1]))
-                || !asciiHex(static_cast<unsigned char>(input[i + 2]))) {
-                return fail(LdapErrorCode::InvalidEscape, i);
+        if (state == State::NeedChild || state == State::AfterChild) {
+            while (cursor < input.size() && structuralSpace(input[cursor])) { ++cursor; }
+            if (cursor == input.size()) {
+                return ParseError{LdapErrorCode::UnbalancedParenthesis, cursor};
             }
-            i += 2;
+            if (input[cursor] == ')') {
+                if (state == State::NeedChild) {
+                    return ParseError{LdapErrorCode::EmptyGroup, cursor};
+                }
+                events.push_back(Event{EventKind::Close, cursor, cursor + 1, stack[depth - 1].op});
+                ++cursor;
+                --depth;
+                if (depth == 0) { state = State::Done; }
+                else { ++stack[depth - 1].children; state = State::AfterChild; }
+                continue;
+            }
+            if (input[cursor] != '(') {
+                return ParseError{LdapErrorCode::InvalidSyntax, cursor};
+            }
+            if (state == State::AfterChild && stack[depth - 1].op == '!') {
+                return ParseError{LdapErrorCode::InvalidGroupArity, cursor};
+            }
+            state = State::NeedFilter;
+            continue;
+        }
+        if (cursor == input.size()) {
+            return ParseError{LdapErrorCode::UnbalancedParenthesis, cursor};
+        }
+        if (input[cursor] != '(') {
+            return ParseError{input[cursor] == ')' ? LdapErrorCode::UnbalancedParenthesis
+                                                     : LdapErrorCode::InvalidSyntax, cursor};
+        }
+        if (depth == stack.size()) {
+            return ParseError{LdapErrorCode::DepthExceeded, cursor};
+        }
+        if (cursor + 1 == input.size()) {
+            return ParseError{LdapErrorCode::UnbalancedParenthesis, input.size()};
+        }
+        const char op{input[cursor + 1]};
+        if (op == '&' || op == '|' || op == '!') {
+            events.push_back(Event{EventKind::Open, cursor, cursor + 2, op});
+            stack[depth++] = Frame{op, 0};
+            cursor += 2;
+            state = State::NeedChild;
+            continue;
+        }
+        const auto leaf{scanLeaf(input, cursor)};
+        if (leaf.error.has_value()) { return leaf.error; }
+        events.push_back(Event{EventKind::Leaf, cursor, leaf.next, 0});
+        cursor = leaf.next;
+        if (depth == 0) { state = State::Done; }
+        else { ++stack[depth - 1].children; state = State::AfterChild; }
+    }
+}
+
+[[nodiscard]] std::string emitStructure(
+    std::string_view input, const std::vector<Event>& events, FormatOptions options) {
+    const std::string_view eol{options.eol == Eol::CrLf ? "\r\n"
+        : options.eol == Eol::Lf ? "\n" : "\r"};
+    std::string output{};
+    output.reserve(input.size());
+    std::size_t depth{};
+    for (const auto& event : events) {
+        if (event.kind == EventKind::Close) {
+            --depth;
+            if (options.mode == OutputMode::Pretty) {
+                output.append(eol);
+                output.append(depth * 2, ' ');
+            }
+            output.push_back(')');
+            continue;
+        }
+        if (options.mode == OutputMode::Pretty && depth != 0) {
+            output.append(eol);
+            output.append(depth * 2, ' ');
+        }
+        if (event.kind == EventKind::Open) {
+            output.push_back('(');
+            output.push_back(event.op);
+            ++depth;
+        } else {
+            output.append(input.substr(event.begin, event.end - event.begin));
         }
     }
-    return fail(LdapErrorCode::InvalidSyntax, input.size());
+    return output;
 }
 } // namespace
 
@@ -161,6 +301,25 @@ ParseResult parseSimpleEquality(std::string_view input) noexcept {
         return fail(LdapErrorCode::ResourceFailure, 0);
     } catch (...) {
         return fail(LdapErrorCode::InternalFailure, 0);
+    }
+}
+
+FormatResult formatFilter(std::string_view input, FormatOptions options) noexcept {
+    try {
+        if (const auto bad{validateUtf8(input)}; bad.has_value()) {
+            return formatFail(bad->code, bad->offset);
+        }
+        std::vector<Event> events{};
+        if (const auto bad{scanStructure(input, events)}; bad.has_value()) {
+            return formatFail(bad->code, bad->offset);
+        }
+        return FormatResult{emitStructure(input, events, options), std::nullopt};
+    } catch (const std::bad_alloc&) {
+        return formatFail(LdapErrorCode::ResourceFailure, 0);
+    } catch (const std::length_error&) {
+        return formatFail(LdapErrorCode::ResourceFailure, 0);
+    } catch (...) {
+        return formatFail(LdapErrorCode::InternalFailure, 0);
     }
 }
 } // namespace ldap
