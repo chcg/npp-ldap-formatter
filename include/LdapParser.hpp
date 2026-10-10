@@ -56,11 +56,13 @@ struct FormatResult {
 // No lanza excepciones a través del contrato; fallos de recursos son tipados.
 [[nodiscard]] ParseResult parseSimpleEquality(std::string_view input) noexcept;
 
-// Analiza grupos AND/OR/NOT y hojas de igualdad con pila explícita.
+// Analiza grupos AND/OR/NOT y assertions RFC 4515 con pila explícita.
 // Cuenta la raíz: acepta hasta 128 filtros abiertos y rechaza el siguiente '('.
 // La entrada permite SP/HTAB/CR/LF solo entre nodos, en ambos modos de salida;
 // no admite espacios fuera de la raíz. Compact elimina solo esos separadores.
 // UTF-8 de toda la entrada se valida antes de diagnosticar la estructura.
+// Presencia/subcadena distinguen '*' crudo de escapes hexadecimales; extensible
+// admite atributo opcional solo cuando hay regla de coincidencia.
 // Ambos modos preservan cada byte de las hojas. No devuelve salida parcial ni lanza.
 [[nodiscard]] FormatResult formatFilter(
     std::string_view input, FormatOptions options = {}) noexcept;

@@ -166,7 +166,53 @@ int main() {
     formatInvalid("(&(cn=a)", LdapErrorCode::UnbalancedParenthesis, 8);
     formatInvalid("(&(cn=a", LdapErrorCode::UnbalancedParenthesis, 7);
     formatInvalid("(&(cn=a)))", LdapErrorCode::UnbalancedParenthesis, 9);
-    formatInvalid("(&(cn=*))", LdapErrorCode::UnsupportedFilter, 6);
+    formatted("(&(cn=*))", compact, "(&(cn=*))");
+    formatted("(cn~=Ana)", compact, "(cn~=Ana)");
+    formatted("(age>=21)", compact, "(age>=21)");
+    formatted("(age<=65)", compact, "(age<=65)");
+    formatted("(cn=foo*bar*baz)", compact, "(cn=foo*bar*baz)");
+    formatted("(cn=*foo*)", compact, "(cn=*foo*)");
+    formatted("(cn=foo**bar)", compact, "(cn=foo**bar)");
+    formatted("(cn=\\2a*)", compact, "(cn=\\2a*)");
+    formatted("(cn=\\2A)", compact, "(cn=\\2A)");
+    formatted("(cn=*)", prettyLf, "(cn=*)");
+    formatted("(:dn:rule:=x)", compact, "(:dn:rule:=x)");
+    formatted("(cn:dn:rule:=x)", compact, "(cn:dn:rule:=x)");
+    formatted("(cn:=x)", compact, "(cn:=x)");
+    formatted("(:rule:=x)", compact, "(:rule:=x)");
+    formatted("(:DN:2.4.6.8.10:=x)", compact, "(:DN:2.4.6.8.10:=x)");
+    formatted("(cn:dn:=x)", compact, "(cn:dn:=x)");
+    formatted("(cn:caseExactMatch:=Fred Flintstone)", compact,
+        "(cn:caseExactMatch:=Fred Flintstone)");
+    formatted("(cn:rule:=\\2a)", compact, "(cn:rule:=\\2a)");
+    formatted("(:1.2.3:=Wilma Flintstone)", compact,
+        "(:1.2.3:=Wilma Flintstone)");
+    formatted("(cn= Ana \\28x\\29\\2a\\5c\\00 )", compact,
+        "(cn= Ana \\28x\\29\\2a\\5c\\00 )");
+    formatted("(&(cn~= Ana )(sn=foo*bar)(:dn:rule:=x))", prettyLf,
+        "(&\n  (cn~= Ana )\n  (sn=foo*bar)\n  (:dn:rule:=x)\n)");
+    const std::string_view mixedAssertions{
+        "(&(|(cn=foo*bar)(age>=21))(!(cn:dn:rule:= Ana \\2a )))"};
+    const std::string_view mixedPretty{
+        "(&\r\n  (|\r\n    (cn=foo*bar)\r\n    (age>=21)\r\n  )\r\n"
+        "  (!\r\n    (cn:dn:rule:= Ana \\2a )\r\n  )\r\n)"};
+    formatted(mixedAssertions, prettyCrLf, mixedPretty);
+    formatted(mixedPretty, compact, mixedAssertions);
+    formatInvalid("(cn>21)", LdapErrorCode::InvalidSyntax, 3);
+    formatInvalid("(cn~=a*b)", LdapErrorCode::InvalidSyntax, 6);
+    formatInvalid("(cn>=a*b)", LdapErrorCode::InvalidSyntax, 6);
+    formatInvalid("(cn<=a*b)", LdapErrorCode::InvalidSyntax, 6);
+    formatInvalid("(cn:rule:=a*b)", LdapErrorCode::InvalidSyntax, 11);
+    formatInvalid("(:dn:=x)", LdapErrorCode::InvalidAttribute, 4);
+    formatInvalid("(:=x)", LdapErrorCode::InvalidAttribute, 1);
+    formatInvalid("(cn:dn:)", LdapErrorCode::InvalidAttribute, 7);
+    formatInvalid("(cn:rule=x)", LdapErrorCode::InvalidSyntax, 8);
+    formatInvalid("(cn:rule:dn:=x)", LdapErrorCode::InvalidSyntax, 8);
+    formatInvalid("(cn:bad;option:=x)", LdapErrorCode::InvalidAttribute, 7);
+    formatInvalid("(cn:1..2:=x)", LdapErrorCode::InvalidAttribute, 6);
+    formatInvalid("(cn=abc\\2)", LdapErrorCode::InvalidEscape, 7);
+    formatInvalid("(cn=\\GG)", LdapErrorCode::InvalidEscape, 4);
+    formatInvalid(std::string{"(cn=\xC0\xAF)"}, LdapErrorCode::InvalidUtf8, 4);
     formatInvalid("(&(cn_name=a))", LdapErrorCode::InvalidAttribute, 5);
     formatInvalid("(&(cn=\\GG))", LdapErrorCode::InvalidEscape, 6);
     formatInvalid(std::string{"(&(cn=a\0b))", 11}, LdapErrorCode::RawNul, 7);

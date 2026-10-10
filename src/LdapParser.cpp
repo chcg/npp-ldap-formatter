@@ -106,6 +106,130 @@ struct LeafResult {
     std::optional<ParseError> error{};
 };
 
+[[nodiscard]] std::optional<std::size_t> validateMatchingRule(
+    std::string_view input, std::size_t begin, std::size_t end) noexcept {
+    for (std::size_t i{begin}; i < end; ++i) {
+        if (input[i] == ';') { return i; }
+    }
+    return validateAttribute(input, begin, end);
+}
+
+[[nodiscard]] constexpr bool isDn(std::string_view token) noexcept {
+    return token.size() == 2
+        && (token[0] == 'd' || token[0] == 'D')
+        && (token[1] == 'n' || token[1] == 'N');
+}
+
+[[nodiscard]] LeafResult scanAssertionLeaf(std::string_view input, std::size_t open) noexcept {
+    const std::size_t begin{open + 1};
+    std::size_t cursor{begin};
+    while (cursor < input.size()) {
+        const char ch{input[cursor]};
+        if (ch == '=' || ch == '~' || ch == '>' || ch == '<' || ch == ':'
+            || ch == ')' || ch == '(') { break; }
+        ++cursor;
+    }
+    if (cursor == input.size()) {
+        return {0, ParseError{LdapErrorCode::UnbalancedParenthesis, cursor}};
+    }
+    const char separator{input[cursor]};
+    if (separator == '(' || separator == ')') {
+        return {0, ParseError{LdapErrorCode::InvalidSyntax, cursor}};
+    }
+    const bool hasAttribute{cursor != begin};
+    if (hasAttribute) {
+        if (const auto bad{validateAttribute(input, begin, cursor)}; bad.has_value()) {
+            return {0, ParseError{LdapErrorCode::InvalidAttribute, *bad}};
+        }
+    } else if (separator != ':') {
+        return {0, ParseError{LdapErrorCode::InvalidAttribute, begin}};
+    }
+
+    bool allowWildcard{};
+    if (separator == ':') {
+        const auto tokenEnd = [&input](std::size_t start) noexcept {
+            std::size_t end{start};
+            while (end < input.size() && input[end] != ':' && input[end] != '='
+                && input[end] != '(' && input[end] != ')') { ++end; }
+            return end;
+        };
+        ++cursor;
+        if (cursor < input.size() && input[cursor] == '=') {
+            if (!hasAttribute) {
+                return {0, ParseError{LdapErrorCode::InvalidAttribute, cursor - 1}};
+            }
+            ++cursor;
+        } else {
+            const std::size_t firstBegin{cursor};
+            const std::size_t firstEnd{tokenEnd(firstBegin)};
+            if (firstBegin == firstEnd) {
+                return {0, ParseError{LdapErrorCode::InvalidAttribute, firstBegin}};
+            }
+            if (isDn(input.substr(firstBegin, firstEnd - firstBegin))) {
+                if (firstEnd == input.size() || input[firstEnd] != ':') {
+                    return {0, ParseError{LdapErrorCode::InvalidSyntax, firstEnd}};
+                }
+                cursor = firstEnd + 1;
+                if (cursor < input.size() && input[cursor] == '=') {
+                    if (!hasAttribute) {
+                        return {0, ParseError{LdapErrorCode::InvalidAttribute, firstEnd}};
+                    }
+                    ++cursor;
+                } else {
+                    const std::size_t ruleBegin{cursor};
+                    const std::size_t ruleEnd{tokenEnd(ruleBegin)};
+                    if (const auto bad{validateMatchingRule(input, ruleBegin, ruleEnd)};
+                        bad.has_value()) {
+                        return {0, ParseError{LdapErrorCode::InvalidAttribute, *bad}};
+                    }
+                    cursor = ruleEnd;
+                    if (cursor + 1 >= input.size() || input[cursor] != ':'
+                        || input[cursor + 1] != '=') {
+                        return {0, ParseError{LdapErrorCode::InvalidSyntax, cursor}};
+                    }
+                    cursor += 2;
+                }
+            } else {
+                if (const auto bad{validateMatchingRule(input, firstBegin, firstEnd)};
+                    bad.has_value()) {
+                    return {0, ParseError{LdapErrorCode::InvalidAttribute, *bad}};
+                }
+                cursor = firstEnd;
+                if (cursor + 1 >= input.size() || input[cursor] != ':'
+                    || input[cursor + 1] != '=') {
+                    return {0, ParseError{LdapErrorCode::InvalidSyntax, cursor}};
+                }
+                cursor += 2;
+            }
+        }
+    } else if (separator == '=') {
+        allowWildcard = true;
+        ++cursor;
+    } else {
+        if (cursor + 1 >= input.size() || input[cursor + 1] != '=') {
+            return {0, ParseError{LdapErrorCode::InvalidSyntax, cursor}};
+        }
+        cursor += 2;
+    }
+
+    for (std::size_t i{cursor}; i < input.size(); ++i) {
+        const auto ch{static_cast<unsigned char>(input[i])};
+        if (ch == ')') { return {i + 1, std::nullopt}; }
+        if (ch == '(' || (ch == '*' && !allowWildcard)) {
+            return {0, ParseError{LdapErrorCode::InvalidSyntax, i}};
+        }
+        if (ch == 0) { return {0, ParseError{LdapErrorCode::RawNul, i}}; }
+        if (ch == '\\') {
+            if (input.size() - i <= 2 || !asciiHex(static_cast<unsigned char>(input[i + 1]))
+                || !asciiHex(static_cast<unsigned char>(input[i + 2]))) {
+                return {0, ParseError{LdapErrorCode::InvalidEscape, i}};
+            }
+            i += 2;
+        }
+    }
+    return {0, ParseError{LdapErrorCode::UnbalancedParenthesis, input.size()}};
+}
+
 [[nodiscard]] LeafResult scanLeaf(std::string_view input, std::size_t open) noexcept {
     std::size_t equals{open + 1};
     while (equals < input.size() && input[equals] != '=') {
@@ -247,7 +371,7 @@ struct Frame {
             state = State::NeedChild;
             continue;
         }
-        const auto leaf{scanLeaf(input, cursor)};
+        const auto leaf{scanAssertionLeaf(input, cursor)};
         if (leaf.error.has_value()) { return leaf.error; }
         events.push_back(Event{EventKind::Leaf, cursor, leaf.next, 0});
         cursor = leaf.next;
