@@ -1,9 +1,9 @@
 #include "LdapParser.hpp"
 
+#include <algorithm>
 #include <array>
 #include <new>
 #include <stdexcept>
-#include <algorithm>
 #include <utility>
 
 namespace ldap {
@@ -23,7 +23,6 @@ struct Checkpoint {
         }
     }
 };
-
 
 struct PhaseGuard {
     Checkpoint& stop;
@@ -135,6 +134,43 @@ struct LeafResult {
     std::optional<ParseError> error{};
 };
 
+enum class WildcardPolicy { Allow, InvalidSyntax, UnsupportedFilter };
+
+// The caller owns the phase so extraction does not change checkpoint traces.
+[[nodiscard]] LeafResult scanAssertionValue(
+    std::string_view input, std::size_t begin, WildcardPolicy wildcard, Checkpoint& stop) {
+    for (std::size_t i{begin}; i < input.size(); ++i) {
+        stop.check(i);
+        const auto ch{static_cast<unsigned char>(input[i])};
+        if (ch == ')') { return {i + 1, std::nullopt}; }
+        if (ch == '(') { return {0, ParseError{LdapErrorCode::InvalidSyntax, i}}; }
+        if (ch == '*' && wildcard != WildcardPolicy::Allow) {
+            const auto code{wildcard == WildcardPolicy::UnsupportedFilter
+                ? LdapErrorCode::UnsupportedFilter : LdapErrorCode::InvalidSyntax};
+            return {0, ParseError{code, i}};
+        }
+        if (ch == 0) { return {0, ParseError{LdapErrorCode::RawNul, i}}; }
+        if (ch == '\\') {
+            if (input.size() - i <= 2 || !asciiHex(static_cast<unsigned char>(input[i + 1]))
+                || !asciiHex(static_cast<unsigned char>(input[i + 2]))) {
+                return {0, ParseError{LdapErrorCode::InvalidEscape, i}};
+            }
+            i += 2;
+        }
+    }
+    return {0, ParseError{LdapErrorCode::UnbalancedParenthesis, input.size()}};
+}
+
+void appendCheckedRange(BudgetString& output, std::string_view input,
+    std::size_t begin, std::size_t end, Checkpoint& stop) {
+    for (std::size_t pos{begin}; pos < end;) {
+        stop.check(pos, true);
+        const auto amount{std::min<std::size_t>(1024, end - pos)};
+        output.append(input.data() + pos, amount);
+        pos += amount;
+    }
+}
+
 [[nodiscard]] std::optional<std::size_t> validateMatchingRule(
     std::string_view input, std::size_t begin, std::size_t end, Checkpoint& stop) {
     PhaseGuard phase{stop, CorePhase::MatchingRule};
@@ -245,23 +281,8 @@ struct LeafResult {
         cursor += 2;
     }
 
-    for (std::size_t i{cursor}; i < input.size(); ++i) {
-        stop.check(i);
-        const auto ch{static_cast<unsigned char>(input[i])};
-        if (ch == ')') { return {i + 1, std::nullopt}; }
-        if (ch == '(' || (ch == '*' && !allowWildcard)) {
-            return {0, ParseError{LdapErrorCode::InvalidSyntax, i}};
-        }
-        if (ch == 0) { return {0, ParseError{LdapErrorCode::RawNul, i}}; }
-        if (ch == '\\') {
-            if (input.size() - i <= 2 || !asciiHex(static_cast<unsigned char>(input[i + 1]))
-                || !asciiHex(static_cast<unsigned char>(input[i + 2]))) {
-                return {0, ParseError{LdapErrorCode::InvalidEscape, i}};
-            }
-            i += 2;
-        }
-    }
-    return {0, ParseError{LdapErrorCode::UnbalancedParenthesis, input.size()}};
+    return scanAssertionValue(input, cursor,
+        allowWildcard ? WildcardPolicy::Allow : WildcardPolicy::InvalidSyntax, stop);
 }
 
 [[nodiscard]] LeafResult scanLeaf(std::string_view input, std::size_t open, Checkpoint& stop) {
@@ -285,24 +306,7 @@ struct LeafResult {
         return {0, ParseError{LdapErrorCode::InvalidAttribute, *bad}};
     }
 
-    for (std::size_t i{equals + 1}; i < input.size(); ++i) {
-        stop.check(i);
-        const auto ch{static_cast<unsigned char>(input[i])};
-        if (ch == ')') {
-            return {i + 1, std::nullopt};
-        }
-        if (ch == '(') { return {0, ParseError{LdapErrorCode::InvalidSyntax, i}}; }
-        if (ch == '*') { return {0, ParseError{LdapErrorCode::UnsupportedFilter, i}}; }
-        if (ch == 0) { return {0, ParseError{LdapErrorCode::RawNul, i}}; }
-        if (ch == '\\') {
-            if (input.size() - i <= 2 || !asciiHex(static_cast<unsigned char>(input[i + 1]))
-                || !asciiHex(static_cast<unsigned char>(input[i + 2]))) {
-                return {0, ParseError{LdapErrorCode::InvalidEscape, i}};
-            }
-            i += 2;
-        }
-    }
-    return {0, ParseError{LdapErrorCode::UnbalancedParenthesis, input.size()}};
+    return scanAssertionValue(input, equals + 1, WildcardPolicy::UnsupportedFilter, stop);
 }
 
 [[nodiscard]] ParseResult parseValidated(std::string_view input, Checkpoint& stop) {
@@ -344,6 +348,14 @@ struct Frame {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
 }
 
+void skipStructuralSpace(std::string_view input, std::size_t& cursor, Checkpoint& stop) {
+    while (cursor < input.size() && structuralSpace(input[cursor])) {
+        PhaseGuard whitespace{stop, CorePhase::Whitespace};
+        stop.check(cursor);
+        ++cursor;
+    }
+}
+
 [[nodiscard]] FormatResult formatFail(LdapErrorCode code, std::size_t offset) noexcept {
     return FormatResult{{}, {}, ParseError{code, offset}};
 }
@@ -366,7 +378,7 @@ template<class Consumer>
                                                      : LdapErrorCode::InvalidSyntax, cursor};
         }
         if (state == State::NeedChild || state == State::AfterChild) {
-            while (cursor < input.size() && structuralSpace(input[cursor])) { PhaseGuard whitespace{stop, CorePhase::Whitespace}; stop.check(cursor); ++cursor; }
+            skipStructuralSpace(input, cursor, stop);
             if (cursor == input.size()) {
                 return ParseError{LdapErrorCode::UnbalancedParenthesis, cursor};
             }
@@ -404,7 +416,7 @@ template<class Consumer>
             return ParseError{LdapErrorCode::UnbalancedParenthesis, input.size()};
         }
         std::size_t component{cursor + 1};
-        while (component < input.size() && structuralSpace(input[component])) { PhaseGuard whitespace{stop, CorePhase::Whitespace}; stop.check(component); ++component; }
+        skipStructuralSpace(input, component, stop);
         if (component == input.size()) {
             return ParseError{LdapErrorCode::UnbalancedParenthesis, component};
         }
@@ -424,7 +436,6 @@ template<class Consumer>
         else { ++stack[depth - 1].children; state = State::AfterChild; }
     }
 }
-
 
 struct Consumer {
     std::string_view input{};
@@ -459,12 +470,7 @@ struct Consumer {
                 if (event.kind == EventKind::Open) { output->push_back('('); output->push_back(event.op); }
                 else if (event.kind == EventKind::Close) { output->push_back(')'); }
                 else {
-                    for (std::size_t pos{event.begin}; pos < event.end;) {
-                        stop.check(pos, true);
-                        const auto amount{std::min<std::size_t>(1024, event.end - pos)};
-                        output->append(input.data() + pos, amount);
-                        pos += amount;
-                    }
+                    appendCheckedRange(*output, input, event.begin, event.end, stop);
                 }
             }
         }
@@ -519,12 +525,7 @@ ParseResult parseSimpleEquality(std::string_view input, FormatOptions options) n
         // Force heap ownership so extracting even short text retains its charge.
         result.compact.reserve(std::max(input.size(), result.compact.capacity() + 1));
         PhaseGuard copy{stop, CorePhase::Copy};
-        for (std::size_t pos{}; pos < input.size();) {
-            stop.check(pos, true);
-            const auto amount{std::min<std::size_t>(1024, input.size() - pos)};
-            result.compact.append(input.data() + pos, amount);
-            pos += amount;
-        }
+        appendCheckedRange(result.compact, input, 0, input.size(), stop);
         stop.phase = CorePhase::Publish;
         stop.check(input.size(), true);
         return result;

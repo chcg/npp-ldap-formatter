@@ -347,6 +347,18 @@ void quotasAndCancellation() {
             "Controlled cancellation phase failed");
         require(budget->used() == baseline, "Cancellation leaked temporary/output reservations");
     }
+    {
+        const std::string nested{"(&(cn=" + std::string(8192, 'x') + "))"};
+        constexpr std::size_t leafBegin{2};
+        StopAt nestedSignal{{}, ldap::CorePhase::Copy, false, leafBegin + 1024};
+        options.stop = nestedSignal.source.get_token();
+        options.checkpointContext = &nestedSignal;
+        const auto result{ldap::formatFilter(nested, options)};
+        require(nestedSignal.observed && !result.ok() && result.text.empty()
+            && result.error->code == LdapErrorCode::Cancelled
+            && result.error->offset == leafBegin + 1024 && budget->used() == baseline,
+            "Nested leaf copy lost source offset or leaked reservations");
+    }
     StopAt simpleSignal{{}, ldap::CorePhase::Copy, false, 1024};
     options.stop = simpleSignal.source.get_token();
     options.checkpointContext = &simpleSignal;
@@ -528,6 +540,16 @@ int main() {
     formatInvalid("(cn:1..2:=x)", LdapErrorCode::InvalidAttribute, 6);
     formatInvalid("(cn=abc\\2)", LdapErrorCode::InvalidEscape, 7);
     formatInvalid("(cn=\\GG)", LdapErrorCode::InvalidEscape, 4);
+    formatInvalid("(cn>=\\GG)", LdapErrorCode::InvalidEscape, 5);
+    formatInvalid("(cn<=\\2)", LdapErrorCode::InvalidEscape, 5);
+    formatInvalid("(cn~=\\)", LdapErrorCode::InvalidEscape, 5);
+    formatInvalid("(cn:rule:=\\GG)", LdapErrorCode::InvalidEscape, 10);
+    formatInvalid("(cn:rule:=\\2)", LdapErrorCode::InvalidEscape, 10);
+    formatInvalid(std::string{"(cn>=\0)", 7}, LdapErrorCode::RawNul, 5);
+    formatInvalid(std::string{"(cn:rule:=\0)", 12}, LdapErrorCode::RawNul, 10);
+    formatted("(cn>=\\2A)", compact, "(cn>=\\2A)");
+    formatted("(cn<=\\2a)", compact, "(cn<=\\2a)");
+    formatted("(cn~=\\2A)", compact, "(cn~=\\2A)");
     formatInvalid(std::string{"(cn=\xC0\xAF)"}, LdapErrorCode::InvalidUtf8, 4);
     formatInvalid("(&(cn_name=a))", LdapErrorCode::InvalidAttribute, 5);
     formatInvalid("(&(cn=\\GG))", LdapErrorCode::InvalidEscape, 6);
