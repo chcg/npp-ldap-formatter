@@ -56,6 +56,29 @@ void formatInvalid(std::string_view input, ldap::LdapErrorCode code, std::size_t
     }
 }
 
+void idempotentModes(std::string_view input, std::string_view expectedCompact,
+    std::string_view expectedPretty, ldap::Eol eol) {
+    const ldap::FormatOptions compact{ldap::OutputMode::Compact, eol};
+    const ldap::FormatOptions pretty{ldap::OutputMode::Pretty, eol};
+    const auto compactOnce{ldap::formatFilter(input, compact)};
+    const auto prettyOnce{ldap::formatFilter(input, pretty)};
+    if (!compactOnce.ok() || compactOnce.text != expectedCompact
+        || !prettyOnce.ok() || prettyOnce.text != expectedPretty) {
+        std::cerr << "Cross-mode formatter produced unexpected bytes\n";
+        ++failures;
+        return;
+    }
+    const auto compactTwice{ldap::formatFilter(compactOnce.text, compact)};
+    const auto prettyTwice{ldap::formatFilter(prettyOnce.text, pretty)};
+    const auto compactFromPretty{ldap::formatFilter(prettyOnce.text, compact)};
+    if (!compactTwice.ok() || compactTwice.text != expectedCompact
+        || !prettyTwice.ok() || prettyTwice.text != expectedPretty
+        || !compactFromPretty.ok() || compactFromPretty.text != expectedCompact) {
+        std::cerr << "Pretty/Compact idempotence invariant failed\n";
+        ++failures;
+    }
+}
+
 std::string nestedNot(std::size_t levels) {
     std::string input{};
     for (std::size_t i{1}; i < levels; ++i) { input.append("(!"); }
@@ -152,6 +175,17 @@ int main() {
         "(&(cn= John  Doe )(sn=\\2A))");
     formatted("(& \t\n (cn= John  Doe )\r\n (sn=\\2A)\t)", prettyLf,
         "(&\n  (cn= John  Doe )\n  (sn=\\2A)\n)");
+    idempotentModes("( & (cn=foo) (sn=bar) )", "(&(cn=foo)(sn=bar))",
+        "(&\r\n  (cn=foo)\r\n  (sn=bar)\r\n)", ldap::Eol::CrLf);
+    idempotentModes("(\t|\n(cn=John Doe)\r(sn=Jos\xC3\xA9\\2A) )",
+        "(|(cn=John Doe)(sn=Jos\xC3\xA9\\2A))",
+        "(|\n  (cn=John Doe)\n  (sn=Jos\xC3\xA9\\2A)\n)", ldap::Eol::Lf);
+    idempotentModes("( \t!\n(cn=a) )", "(!(cn=a))",
+        "(!\n  (cn=a)\n)", ldap::Eol::Lf);
+    idempotentModes("(\r&(cn=a)(sn=b))", "(&(cn=a)(sn=b))",
+        "(&\r\n  (cn=a)\r\n  (sn=b)\r\n)", ldap::Eol::CrLf);
+    idempotentModes("(\n|(cn=a)(sn=b))", "(|(cn=a)(sn=b))",
+        "(|\n  (cn=a)\n  (sn=b)\n)", ldap::Eol::Lf);
     formatted("(cn= John  Doe )", prettyLf, "(cn= John  Doe )");
     const auto defaultPretty{ldap::formatFilter("(&(cn=a)(sn=b))")};
     if (!defaultPretty.ok() || defaultPretty.text != "(&\r\n  (cn=a)\r\n  (sn=b)\r\n)") {
@@ -218,6 +252,10 @@ int main() {
     formatInvalid(std::string{"(&(cn=a\0b))", 11}, LdapErrorCode::RawNul, 7);
     formatInvalid(" (cn=a)", LdapErrorCode::InvalidSyntax, 0);
     formatInvalid("(cn=a) ", LdapErrorCode::InvalidSyntax, 6);
+    formatInvalid("( cn = foo )", LdapErrorCode::InvalidAttribute, 1);
+    formatInvalid("( \t\r\n", LdapErrorCode::UnbalancedParenthesis, 5);
+    formatInvalid("( \t)", LdapErrorCode::InvalidSyntax, 3);
+    formatInvalid("( \nX=foo)", LdapErrorCode::InvalidAttribute, 1);
     formatInvalid(std::string{"bad=\xC0"}, LdapErrorCode::InvalidUtf8, 4);
 
     formatted(nestedNot(5), compact, nestedNot(5));

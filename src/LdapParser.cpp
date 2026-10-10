@@ -363,11 +363,16 @@ struct Frame {
         if (cursor + 1 == input.size()) {
             return ParseError{LdapErrorCode::UnbalancedParenthesis, input.size()};
         }
-        const char op{input[cursor + 1]};
+        std::size_t component{cursor + 1};
+        while (component < input.size() && structuralSpace(input[component])) { ++component; }
+        if (component == input.size()) {
+            return ParseError{LdapErrorCode::UnbalancedParenthesis, component};
+        }
+        const char op{input[component]};
         if (op == '&' || op == '|' || op == '!') {
-            events.push_back(Event{EventKind::Open, cursor, cursor + 2, op});
+            events.push_back(Event{EventKind::Open, cursor, component + 1, op});
             stack[depth++] = Frame{op, 0};
-            cursor += 2;
+            cursor = component + 1;
             state = State::NeedChild;
             continue;
         }
