@@ -21,3 +21,4 @@ __pycache__/
 _bmad/
 _bmad-output/
 *.pyc
+.uv-cache/
