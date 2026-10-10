@@ -71,11 +71,25 @@ void formatted(std::string_view input, ldap::FormatOptions options, std::string_
 }
 
 void formatInvalid(std::string_view input, ldap::LdapErrorCode code, std::size_t offset) {
-    const auto result{ldap::formatFilter(input)};
-    if (result.ok() || !result.text.empty() || result.error->code != code
-        || result.error->offset != offset) {
-        std::cerr << "Wrong structural error code/offset or partial output\n";
-        ++failures;
+    for (const auto mode : {ldap::OutputMode::Pretty, ldap::OutputMode::Compact}) {
+        for (const auto eol : {ldap::Eol::Lf, ldap::Eol::CrLf}) {
+            // Este fixture de expansión usa CRLF; LF tiene fronteras propias.
+            if (code == ldap::LdapErrorCode::OutputTooLarge
+                && (mode != ldap::OutputMode::Pretty || eol != ldap::Eol::CrLf)) { continue; }
+            const auto result{ldap::formatFilter(input, {mode, eol})};
+            if (result.ok() || !result.text.empty() || result.error->code != code
+                || result.error->offset != offset) {
+                std::cerr << "Wrong structural error for " << input.substr(0, 80)
+                    << " mode=" << static_cast<int>(mode) << " EOL=" << static_cast<int>(eol)
+                    << ": expected " << static_cast<int>(code) << '/' << offset;
+                if (result.error) {
+                    std::cerr << ", got " << static_cast<int>(result.error->code)
+                        << '/' << result.error->offset;
+                }
+                std::cerr << '\n';
+                ++failures;
+            }
+        }
     }
 }
 
@@ -87,17 +101,24 @@ void idempotentModes(std::string_view input, std::string_view expectedCompact,
     const auto prettyOnce{ldap::formatFilter(input, pretty)};
     if (!compactOnce.ok() || compactOnce.text != expectedCompact
         || !prettyOnce.ok() || prettyOnce.text != expectedPretty) {
-        std::cerr << "Cross-mode formatter produced unexpected bytes\n";
+        std::cerr << "Cross-mode fixture " << input.substr(0, 80)
+            << " EOL=" << static_cast<int>(eol) << " canonical bytes failed\n";
         ++failures;
         return;
     }
     const auto compactTwice{ldap::formatFilter(compactOnce.text, compact)};
     const auto prettyTwice{ldap::formatFilter(prettyOnce.text, pretty)};
     const auto compactFromPretty{ldap::formatFilter(prettyOnce.text, compact)};
+    const auto prettyFromCompact{ldap::formatFilter(compactOnce.text, pretty)};
     if (!compactTwice.ok() || compactTwice.text != expectedCompact
         || !prettyTwice.ok() || prettyTwice.text != expectedPretty
-        || !compactFromPretty.ok() || compactFromPretty.text != expectedCompact) {
-        std::cerr << "Pretty/Compact idempotence invariant failed\n";
+        || !compactFromPretty.ok() || compactFromPretty.text != expectedCompact
+        || !prettyFromCompact.ok() || prettyFromCompact.text != expectedPretty) {
+        std::cerr << "Fixture " << input.substr(0, 80) << " EOL=" << static_cast<int>(eol)
+            << " C(C)=" << (compactTwice.ok() && compactTwice.text == expectedCompact)
+            << " P(P)=" << (prettyTwice.ok() && prettyTwice.text == expectedPretty)
+            << " C(P)=" << (compactFromPretty.ok() && compactFromPretty.text == expectedCompact)
+            << " P(C)=" << (prettyFromCompact.ok() && prettyFromCompact.text == expectedPretty) << '\n';
         ++failures;
     }
 }
@@ -108,6 +129,107 @@ std::string nestedNot(std::size_t levels) {
     input.append("(cn=x)");
     for (std::size_t i{1}; i < levels; ++i) { input.push_back(')'); }
     return input;
+}
+
+// Oráculo de emisión independiente del parser: las hojas son bytes inmutables.
+struct FilterFixture {
+    std::string leaf{};
+    char operation{};
+    std::vector<FilterFixture> children{};
+};
+
+std::string fixtureText(const FilterFixture& node, std::string_view eol,
+    std::size_t depth = 0, bool decorated = false) {
+    if (!node.leaf.empty()) { return node.leaf; }
+    std::string result{"("};
+    if (decorated) { result.append(" \t"); }
+    result.push_back(node.operation);
+    for (const auto& child : node.children) {
+        if (decorated) { result.append(" \r\n\t "); }
+        else if (!eol.empty()) {
+            result.append(eol);
+            result.append(2 * (depth + 1), ' ');
+        }
+        result.append(fixtureText(child, eol, depth + 1, decorated));
+    }
+    if (decorated) { result.append(" \n "); }
+    else if (!eol.empty()) {
+        result.append(eol);
+        result.append(2 * depth, ' ');
+    }
+    result.push_back(')');
+    return result;
+}
+
+void conformanceProperties() {
+    // RFC 4515 §4 más bordes del perfil UTF-8 estricto del proyecto.
+    const std::vector<std::string> leaves{
+        "(cn=Babs Jensen)", "(seeAlso=)", "(o=univ*of*mich*)",
+        "(cn=*)", "(cn=**)", "(cn=*\\2A*)", "(cn=\\28\\29\\2A\\5C\\00\\ff)",
+        "(cn=\\2a\\5c)", "(cn~=John Doe)", "(age>=21)", "(age<=65)",
+        "(cn:caseExactMatch:=Fred Flintstone)", "(cn:=Betty Rubble)", "(cn:dn:dn:=x)",
+        "(sn:dn:2.4.6.8.10:=Barney Rubble)", "(o:dn:=Ace Industry)",
+        "(:1.2.3:=Wilma Flintstone)", "(:DN:2.4.6.8.10:=Dino)",
+        "(1.2.840.113556;binary=\\00)", "(cn= John\tDoe\r\n )",
+        "(cn=Jos\xC3\xA9 \xF0\x9F\x98\x80)"};
+    std::vector<FilterFixture> corpus{};
+    for (const auto& leaf : leaves) { corpus.push_back({leaf, {}, {}}); }
+    // Cada hoja recorre AND, OR y NOT; las combinaciones son reproducibles.
+    for (std::size_t i{}; i < leaves.size(); ++i) {
+        corpus.push_back({{}, '&', {
+            {leaves[i], {}, {}},
+            {{}, '|', {{leaves[(i + 1) % leaves.size()], {}, {}},
+                {{}, '!', {{leaves[(i + 2) % leaves.size()], {}, {}}}}}}}});
+    }
+    FilterFixture deep{leaves.front(), {}, {}};
+    for (std::size_t level{1}; level < ldap::MaxDepth; ++level) {
+        std::vector<FilterFixture> child{};
+        child.push_back(std::move(deep));
+        deep = {{}, '!', std::move(child)};
+    }
+    corpus.push_back(std::move(deep));
+    for (const auto& node : corpus) {
+        const auto compact{fixtureText(node, {})};
+        const auto decorated{fixtureText(node, {}, 0, true)};
+        for (const auto eol : {ldap::Eol::Lf, ldap::Eol::CrLf, ldap::Eol::Cr}) {
+            const auto newline{eol == ldap::Eol::Lf ? "\n" : eol == ldap::Eol::Cr ? "\r" : "\r\n"};
+            const auto pretty{fixtureText(node, newline)};
+            idempotentModes(compact, compact, pretty, eol);
+            idempotentModes(decorated, compact, pretty, eol);
+            // P_LF(P_CRLF(x)) y P_CRLF(P_LF(x)); conservar EOL literales.
+            for (const auto sourceEol : {"\n", "\r\n", "\r"}) {
+                const auto other{fixtureText(node, sourceEol)};
+                idempotentModes(other, compact, pretty, eol);
+            }
+        }
+    }
+    using ldap::LdapErrorCode;
+    formatInvalid("(&(cn=Jos\xC3\xA9)(sn=\\GG))", LdapErrorCode::InvalidEscape, 16);
+    formatInvalid("(&(cn=Jos\xC3\xA9)(sn=x)", LdapErrorCode::UnbalancedParenthesis, 18);
+    formatInvalid("(&(cn=x)(sn=\xED\xA0\x80))", LdapErrorCode::InvalidUtf8, 13);
+    formatInvalid("(cn=x)(sn=y)", LdapErrorCode::InvalidSyntax, 6);
+    formatInvalid("(&(!(cn=x)(sn=y)))", LdapErrorCode::InvalidGroupArity, 10);
+    auto budget{std::make_shared<ldap::CoreBudget>()};
+    auto occupied{budget->reserve(budget->remaining())};
+    std::stop_source cancelled{};
+    cancelled.request_stop();
+    for (const auto mode : {ldap::OutputMode::Pretty, ldap::OutputMode::Compact}) {
+        for (const auto eol : {ldap::Eol::Lf, ldap::Eol::CrLf}) {
+            const auto exhausted{ldap::formatFilter("(cn=x)", {mode, eol, {}, budget})};
+            if (exhausted.ok() || !exhausted.text.empty()
+                || exhausted.error->code != LdapErrorCode::MemoryExceeded
+                || exhausted.error->offset != 0 || budget->used() != ldap::MaxCoreBytes) {
+                std::cerr << "Memory diagnostic matrix failed\n";
+                ++failures;
+            }
+            const auto stopped{ldap::formatFilter("(cn=x)", {mode, eol, cancelled.get_token(), budget})};
+            if (stopped.ok() || !stopped.text.empty()
+                || stopped.error->code != LdapErrorCode::Cancelled || stopped.error->offset != 0) {
+                std::cerr << "Entry cancellation diagnostic matrix failed\n";
+                ++failures;
+            }
+        }
+    }
 }
 
 void require(bool condition, const char* message) {
@@ -184,6 +306,16 @@ void quotasAndCancellation() {
     const ldap::FormatOptions lf{ldap::OutputMode::Pretty, ldap::Eol::Lf};
     const auto lfResult{ldap::formatFilter(prettyOverflow, lf)};
     require(lfResult.ok() && lfResult.text.size() == ldap::MaxOutputBytes - 1, "LF quota count failed");
+    const std::string lfExact{"(&(cn=" + std::string(ldap::MaxOutputBytes - 12, 'x') + "))"};
+    const auto lfExactResult{ldap::formatFilter(lfExact, lf)};
+    require(lfExactResult.ok() && lfExactResult.text.size() == ldap::MaxOutputBytes,
+        "LF inclusive output maximum failed");
+    const std::string lfOverflow{"(&(cn=" + std::string(ldap::MaxOutputBytes - 11, 'x') + "))"};
+    const auto lfOverflowResult{ldap::formatFilter(lfOverflow, lf)};
+    require(!lfOverflowResult.ok() && lfOverflowResult.text.empty()
+        && lfOverflowResult.error->code == LdapErrorCode::OutputTooLarge
+        && lfOverflowResult.error->offset == lfOverflow.size() - 1,
+        "LF output maximum plus one lacked exact diagnostic");
 
     std::string dense{"(&"};
     dense.reserve(ldap::MaxInputBytes);
@@ -382,6 +514,7 @@ void quotasAndCancellation() {
 } // namespace
 
 int main() {
+    conformanceProperties();
     quotasAndCancellation();
     using ldap::LdapErrorCode;
     valid("(cn=John Doe)");
@@ -577,6 +710,6 @@ int main() {
     formatInvalid(tooDeep, LdapErrorCode::DepthExceeded, 2 * 128);
 
     if (failures != 0) { return EXIT_FAILURE; }
-    std::cout << "LDAP simple equality: all cases passed\n";
+    std::cout << "LDAP core conformance: all cases passed\n";
     return EXIT_SUCCESS;
 }
