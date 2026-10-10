@@ -93,7 +93,7 @@ if(NOT NPP_LDAP_MANIFEST_ONLY)
     add_library(baseline_sdk_probe STATIC cmake/sdk_probe.cpp)
     target_link_libraries(baseline_sdk_probe PRIVATE npp_ldap_host_sdk)
 
-    add_library(ldap_core STATIC src/BuildInfo.cpp src/LdapParser.cpp)
+    add_library(ldap_core STATIC src/BuildInfo.cpp src/LdapParser.cpp src/CoreBudget.cpp)
     target_include_directories(ldap_core PUBLIC include)
     target_compile_features(ldap_core PUBLIC cxx_std_20)
     target_compile_options(ldap_core PRIVATE /W4 /WX /permissive- /utf-8 /EHsc)

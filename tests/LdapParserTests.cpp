@@ -6,6 +6,29 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <atomic>
+#include <thread>
+#include <new>
+
+namespace {
+std::atomic<bool> failNextAllocation{};
+}
+#ifdef _MSC_VER
+_Ret_notnull_ _Post_writable_byte_size_(bytes)
+#endif
+void* operator new(std::size_t bytes) {
+    if (failNextAllocation.exchange(false)) { throw std::bad_alloc{}; }
+    if (auto* pointer{std::malloc(bytes == 0 ? 1 : bytes)}) { return pointer; }
+    throw std::bad_alloc{};
+}
+void operator delete(void* pointer) noexcept { std::free(pointer); }
+void operator delete(void* pointer, std::size_t) noexcept { std::free(pointer); }
+#ifdef _MSC_VER
+_Ret_notnull_ _Post_writable_byte_size_(bytes)
+#endif
+void* operator new[](std::size_t bytes) { return ::operator new(bytes); }
+void operator delete[](void* pointer) noexcept { std::free(pointer); }
+void operator delete[](void* pointer, std::size_t) noexcept { std::free(pointer); }
 
 namespace {
 int failures{};
@@ -86,9 +109,268 @@ std::string nestedNot(std::size_t levels) {
     for (std::size_t i{1}; i < levels; ++i) { input.push_back(')'); }
     return input;
 }
+
+void require(bool condition, const char* message) {
+    if (!condition) { std::cerr << message << '\n'; ++failures; }
+}
+
+struct StopAt {
+    std::stop_source source{};
+    ldap::CorePhase phase{};
+    bool observed{};
+    std::size_t minimumOffset{};
+};
+void stopAt(ldap::CorePhase phase, std::size_t offset, void* context) noexcept {
+    auto& signal{*static_cast<StopAt*>(context)};
+    if (phase == signal.phase && offset >= signal.minimumOffset) {
+        signal.observed = true; signal.source.request_stop();
+    }
+}
+
+void failAtCount(ldap::CorePhase phase, std::size_t, void*) noexcept {
+    if (phase == ldap::CorePhase::Count) { failNextAllocation.store(true); }
+}
+
+template<class Factory, class Text> void resultMoveAssignments(Factory make, Text text) {
+    const std::string shortFilter{"(a=)"};
+    const std::string longFilter{"(cn=" + std::string(4096, 'x') + ")"};
+    for (const std::string_view from : {std::string_view{shortFilter}, std::string_view{longFilter}}) {
+        for (const std::string_view to : {std::string_view{shortFilter}, std::string_view{longFilter}}) {
+            auto sourceBudget{std::make_shared<ldap::CoreBudget>()};
+            auto targetBudget{std::make_shared<ldap::CoreBudget>()};
+            const auto sourceBaseline{sourceBudget->used()};
+            const auto targetBaseline{targetBudget->used()};
+            {
+                ldap::FormatOptions sourceOptions{ldap::OutputMode::Compact};
+                sourceOptions.budget = sourceBudget;
+                auto targetOptions{sourceOptions};
+                targetOptions.budget = targetBudget;
+                auto source{make(from, sourceOptions)};
+                auto target{make(to, targetOptions)};
+                require(source.ok() && target.ok() && sourceBudget->used() > sourceBaseline
+                    && targetBudget->used() > targetBaseline, "Move assignment fixtures lacked storage");
+                const auto sourceCharge{sourceBudget->used()};
+                target = std::move(source);
+                require(target.ok() && text(target) == from && targetBudget->used() == targetBaseline
+                    && sourceBudget->used() == sourceCharge,
+                    "Move assignment lost output or retained overwritten reservations");
+            }
+            require(sourceBudget->used() == sourceBaseline && targetBudget->used() == targetBaseline,
+                "Move assignment budgets did not restore their baselines");
+        }
+    }
+}
+
+void quotasAndCancellation() {
+    using ldap::LdapErrorCode;
+    const ldap::FormatOptions compact{ldap::OutputMode::Compact};
+    const std::string maximum{"(cn=" + std::string(ldap::MaxInputBytes - 5, 'x') + ")"};
+    formatted(maximum, compact, maximum);
+    valid(maximum);
+    formatInvalid(maximum + "x", LdapErrorCode::InputTooLarge, ldap::MaxInputBytes);
+    invalid(maximum + "x", LdapErrorCode::InputTooLarge, ldap::MaxInputBytes);
+    auto invalidOversize{maximum + "x"};
+    invalidOversize.front() = static_cast<char>(0xC0);
+    formatInvalid(invalidOversize, LdapErrorCode::InputTooLarge, ldap::MaxInputBytes);
+    const std::string prettyExact{"(&(cn=" + std::string(ldap::MaxOutputBytes - 14, 'x') + "))"};
+    {
+        const auto result{ldap::formatFilter(prettyExact)};
+        require(result.ok() && result.text.size() == ldap::MaxOutputBytes, "Pretty exact quota failed");
+        if (result.ok()) { formatted(result.text, {}, result.text); }
+    }
+    const std::string prettyOverflow{"(&(cn=" + std::string(ldap::MaxOutputBytes - 13, 'x') + "))"};
+    formatInvalid(prettyOverflow, LdapErrorCode::OutputTooLarge, prettyOverflow.size() - 1);
+    formatted(prettyOverflow, compact, prettyOverflow);
+    const ldap::FormatOptions lf{ldap::OutputMode::Pretty, ldap::Eol::Lf};
+    const auto lfResult{ldap::formatFilter(prettyOverflow, lf)};
+    require(lfResult.ok() && lfResult.text.size() == ldap::MaxOutputBytes - 1, "LF quota count failed");
+
+    std::string dense{"(&"};
+    dense.reserve(ldap::MaxInputBytes);
+    while (dense.size() + 5 <= ldap::MaxInputBytes) { dense.append("(a=)"); }
+    dense.push_back(')');
+    auto budget{std::make_shared<ldap::CoreBudget>()};
+    const auto baseline{budget->used()};
+    auto options{compact};
+    options.budget = budget;
+    {
+        auto snapshot{budget->reserve(maximum.capacity() + 1)};
+        require(snapshot.has_value(), "Snapshot reservation failed");
+        options.inputReservation = &*snapshot;
+        auto delivery{budget->reserve(ldap::MaxCoreBytes - baseline - snapshot->bytes() - ldap::MaxOutputBytes - 16384)};
+        require(delivery.has_value(), "Delivery reservation failed");
+        auto result{ldap::formatFilter(maximum, options)};
+        require(result.ok(), "Externally reserved input rejected");
+        const auto charged{budget->used()};
+        require(charged >= maximum.capacity() + 1 + result.text.capacity() + 1,
+            "Capacities and terminators were not charged");
+        auto moved{std::move(result)};
+        require(moved.ok() && moved.text == maximum && budget->used() == charged,
+            "Moving result released live storage");
+        auto textOnly{std::move(moved.text)};
+        require(textOnly == maximum && budget->used() == charged,
+            "Moving text released its allocation reservation");
+    }
+    require(budget->used() == baseline, "Results/snapshot leaked reservations");
+    options.inputReservation = nullptr;
+    {
+        ldap::BudgetString extracted{};
+        {
+            auto shortResult{ldap::formatFilter("(a=)", options)};
+            require(shortResult.ok(), "Short extracted-text fixture failed");
+            extracted = std::move(shortResult.text);
+        }
+        require(extracted == "(a=)" && budget->used() == baseline + extracted.capacity() + 1,
+            "Extracted short text lost its allocation or budget metadata charge");
+    }
+    require(budget->used() == baseline, "Extracted short text leaked storage");
+    resultMoveAssignments(
+        [](std::string_view input, ldap::FormatOptions opts) { return ldap::formatFilter(input, opts); },
+        [](const ldap::FormatResult& result) { return std::string_view{result.text}; });
+    resultMoveAssignments(
+        [](std::string_view input, ldap::FormatOptions opts) { return ldap::parseSimpleEquality(input, opts); },
+        [](const ldap::ParseResult& result) { return std::string_view{result.compact}; });
+    {
+        const std::string_view source{"(cn=x)"};
+        auto foreignBudget{std::make_shared<ldap::CoreBudget>()};
+        const auto foreignBaseline{foreignBudget->used()};
+        auto foreign{foreignBudget->reserve(source.size())};
+        auto undersized{budget->reserve(source.size() - 1)};
+        const auto localCharge{budget->used()};
+        const auto foreignCharge{foreignBudget->used()};
+        for (const auto* reservation : {&*foreign, &*undersized}) {
+            options.inputReservation = reservation;
+            const auto formattedResult{ldap::formatFilter(source, options)};
+            const auto parsedResult{ldap::parseSimpleEquality(source, options)};
+            require(!formattedResult.ok() && formattedResult.text.empty()
+                && formattedResult.error->code == LdapErrorCode::MemoryExceeded
+                && !parsedResult.ok() && parsedResult.compact.empty()
+                && parsedResult.error->code == LdapErrorCode::MemoryExceeded,
+                "Foreign/undersized reservation was not rejected by both public operations");
+            require(budget->used() == localCharge && foreignBudget->used() == foreignCharge
+                && foreign->bytes() == source.size() && undersized->bytes() == source.size() - 1,
+                "Rejected input reservation altered one of the budgets");
+        }
+        options.inputReservation = nullptr;
+        foreign.reset();
+        require(foreignBudget->used() == foreignBaseline, "Foreign reservation did not release");
+    }
+    require(budget->used() == baseline, "Undersized reservation did not release");
+    {
+        failNextAllocation.store(true);
+        const auto result{ldap::formatFilter("(cn=x)")};
+        require(!failNextAllocation.load() && !result.ok() && result.text.empty()
+            && result.error->code == LdapErrorCode::ResourceFailure,
+            "System failure creating default budget was conflated with quota exhaustion");
+        failNextAllocation.store(true);
+        const auto parsed{ldap::parseSimpleEquality("(cn=x)")};
+        require(!failNextAllocation.load() && !parsed.ok() && parsed.compact.empty()
+            && parsed.error->code == LdapErrorCode::ResourceFailure,
+            "Simple parser default-budget allocation failure was not ResourceFailure");
+        auto faultOptions{options};
+        faultOptions.checkpoint = failAtCount;
+        const auto outputFailure{ldap::formatFilter("(cn=x)", faultOptions)};
+        require(!failNextAllocation.load() && !outputFailure.ok() && outputFailure.text.empty()
+            && outputFailure.error->code == LdapErrorCode::ResourceFailure
+            && budget->used() == baseline, "System output allocation failure leaked budget or had wrong error");
+    }
+    {
+        const auto syntax{ldap::formatFilter("(&(cn=x)", options)};
+        require(!syntax.ok() && syntax.text.empty(), "Shared-budget syntax failure produced output");
+    }
+    require(budget->used() == baseline, "Syntax failure leaked reservations");
+    {
+        const auto outputError{ldap::formatFilter(prettyOverflow,
+            {ldap::OutputMode::Pretty, ldap::Eol::CrLf, {}, budget})};
+        require(!outputError.ok() && outputError.text.empty()
+            && outputError.error->code == LdapErrorCode::OutputTooLarge,
+            "Shared-budget output overflow produced text");
+    }
+    require(budget->used() == baseline, "Output overflow leaked reservations");
+    {
+        const auto result{ldap::formatFilter(dense, options)};
+        require(result.ok() && result.text == dense, "Dense leaves exhausted memory or changed bytes");
+        require(budget->used() <= ldap::MaxCoreBytes, "Memory quota exceeded");
+    }
+    {
+        auto occupied{budget->reserve(budget->remaining())};
+        require(occupied.has_value() && !budget->reserve(1), "Budget inclusive maximum failed");
+        const auto result{ldap::formatFilter("(cn=x)", options)};
+        require(!result.ok() && result.text.empty() && result.error->code == LdapErrorCode::MemoryExceeded,
+            "Exhausted budget did not return typed memory error");
+        require(budget->used() == ldap::MaxCoreBytes, "Failure leaked/released external reservation");
+    }
+    require(budget->used() == baseline, "External reservation leaked");
+    {
+        auto occupied{budget->reserve(ldap::MaxCoreBytes - maximum.size() - 8192)};
+        const auto result{ldap::formatFilter(maximum, options)};
+        require(!result.ok() && result.text.empty() && result.error->code == LdapErrorCode::MemoryExceeded,
+            "Output allocation escaped shared budget");
+        require(budget->used() == baseline + occupied->bytes(), "Failed allocation leaked reservations");
+    }
+    {
+        std::atomic<bool> failed{};
+        const auto exercise = [&budget, &failed] {
+            for (std::size_t i{}; i < 1000; ++i) {
+                auto reservation{budget->reserve(ldap::MaxCoreBytes / 2)};
+                if (budget->used() > ldap::MaxCoreBytes) { failed.store(true); }
+                if (reservation) {
+                    auto moved{std::move(*reservation)};
+                    if (moved.bytes() != ldap::MaxCoreBytes / 2) { failed.store(true); }
+                }
+            }
+        };
+        { std::jthread first{exercise}; std::jthread second{exercise}; std::jthread third{exercise}; }
+        require(!failed.load() && budget->used() == baseline, "Concurrent reservations broke accounting");
+    }
+
+    const std::string attribute{"(" + std::string(8192, 'a') + "=x)"};
+    const std::string rule{"(:" + std::string(8192, 'a') + ":=x)"};
+    const std::string whitespace{"(&" + std::string(8192, ' ') + "(cn=x))"};
+    const std::pair<ldap::CorePhase, std::string_view> cases[]{
+        {ldap::CorePhase::Utf8, maximum}, {ldap::CorePhase::Attribute, attribute},
+        {ldap::CorePhase::MatchingRule, rule}, {ldap::CorePhase::Value, maximum},
+        {ldap::CorePhase::Whitespace, whitespace}, {ldap::CorePhase::Structure, dense},
+        {ldap::CorePhase::Count, dense}, {ldap::CorePhase::Copy, maximum},
+        {ldap::CorePhase::Publish, "(cn=x)"},
+    };
+    for (const auto& [phase, source] : cases) {
+        StopAt signal{{}, phase, false, phase == ldap::CorePhase::Copy ? 1024U : 0U};
+        options.stop = signal.source.get_token();
+        options.checkpoint = stopAt;
+        options.checkpointContext = &signal;
+        const auto result{ldap::formatFilter(source, options)};
+        if (!signal.observed) { std::cerr << "Unobserved phase: " << static_cast<int>(phase) << '\n'; }
+        require(signal.observed && !result.ok() && result.text.empty()
+            && result.error->code == LdapErrorCode::Cancelled && result.error->offset <= source.size()
+            && (phase != ldap::CorePhase::Copy || result.error->offset == 1024),
+            "Controlled cancellation phase failed");
+        require(budget->used() == baseline, "Cancellation leaked temporary/output reservations");
+    }
+    StopAt simpleSignal{{}, ldap::CorePhase::Copy, false, 1024};
+    options.stop = simpleSignal.source.get_token();
+    options.checkpointContext = &simpleSignal;
+    const auto simple{ldap::parseSimpleEquality(maximum, options)};
+    require(simpleSignal.observed && !simple.ok() && simple.compact.empty()
+        && simple.error->code == LdapErrorCode::Cancelled && simple.error->offset == 1024
+        && budget->used() == baseline,
+        "Simple equality cancellation leaked or produced output");
+    std::stop_source stopped{};
+    stopped.request_stop();
+    options.stop = stopped.get_token();
+    options.checkpoint = nullptr;
+    const auto preStopped{ldap::formatFilter("(cn=x)", options)};
+    require(!preStopped.ok() && preStopped.error->code == LdapErrorCode::Cancelled
+        && preStopped.error->offset == 0 && budget->used() == baseline, "Entry cancellation failed");
+    options.stop = {};
+    { const auto fresh{ldap::formatFilter("(cn=x)", options)};
+      require(fresh.ok(), "Fresh operation after cancellation failed"); }
+    require(budget->used() == baseline, "Fresh operation leaked reservations");
+}
 } // namespace
 
 int main() {
+    quotasAndCancellation();
     using ldap::LdapErrorCode;
     valid("(cn=John Doe)");
     valid("(cn= John Doe  )");

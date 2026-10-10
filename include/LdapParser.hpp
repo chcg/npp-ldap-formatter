@@ -1,9 +1,12 @@
 #pragma once
 
+#include "CoreBudget.hpp"
+
 #include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <stop_token>
 
 namespace ldap {
 
@@ -20,6 +23,10 @@ enum class LdapErrorCode {
     RawNul,
     ResourceFailure,
     InternalFailure,
+    InputTooLarge,
+    OutputTooLarge,
+    MemoryExceeded,
+    Cancelled,
 };
 
 struct ParseError {
@@ -28,8 +35,9 @@ struct ParseError {
 };
 
 struct ParseResult {
+    CoreBudget::Reservation storage{};
     // Solo contiene bytes cuando ok() es true; nunca entrega salida parcial.
-    std::string compact{};
+    BudgetString compact{};
     std::optional<ParseError> error{};
 
     [[nodiscard]] bool ok() const noexcept { return !error.has_value(); }
@@ -37,14 +45,25 @@ struct ParseResult {
 
 enum class OutputMode { Pretty, Compact };
 enum class Eol { CrLf, Lf, Cr };
+enum class CorePhase { Entry, Utf8, Attribute, MatchingRule, Value, Whitespace, Structure, Count, Copy, Publish };
+using CheckpointObserver = void (*)(CorePhase, std::size_t, void*) noexcept;
 
 struct FormatOptions {
     OutputMode mode{OutputMode::Pretty};
     Eol eol{Eol::CrLf};
+    std::stop_token stop{};
+    std::shared_ptr<CoreBudget> budget{};
+    // A caller-owned reservation covering this borrowed input, on the same budget.
+    const CoreBudget::Reservation* inputReservation{};
+    // Optional synchronous observer: may request stop; must not modify input.
+    // The callback and context must remain valid until the operation returns.
+    CheckpointObserver checkpoint{};
+    void* checkpointContext{};
 };
 
 struct FormatResult {
-    std::string text{};
+    CoreBudget::Reservation storage{};
+    BudgetString text{};
     std::optional<ParseError> error{};
 
     [[nodiscard]] bool ok() const noexcept { return !error.has_value(); }
@@ -54,7 +73,7 @@ struct FormatResult {
 // Compact copia literalmente atributo, escapes y cada byte del valor.
 // Valida UTF-8 de toda la entrada antes de reportar errores sintácticos.
 // No lanza excepciones a través del contrato; fallos de recursos son tipados.
-[[nodiscard]] ParseResult parseSimpleEquality(std::string_view input) noexcept;
+[[nodiscard]] ParseResult parseSimpleEquality(std::string_view input, FormatOptions options = {}) noexcept;
 
 // Analiza grupos AND/OR/NOT y assertions RFC 4515 con pila explícita.
 // Cuenta la raíz: acepta hasta 128 filtros abiertos y rechaza el siguiente '('.
