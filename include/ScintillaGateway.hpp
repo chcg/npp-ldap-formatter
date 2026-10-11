@@ -19,6 +19,7 @@ struct ScintillaSnapshot {
     SnapshotMetadata metadata{};
     OutputMode mode{OutputMode::Pretty};
     [[nodiscard]] std::string_view text() const noexcept { return {bytes.data(), bytes.empty() ? 0 : bytes.size() - 1}; }
+    [[nodiscard]] const CoreBudget::Reservation& reservation() const noexcept { return storage; }
 private:
     friend class ScintillaGateway;
     ScintillaSnapshot(CoreBudget::Reservation reservation, SnapshotMetadata identity,
@@ -38,6 +39,7 @@ public:
     void initialize(NppData data) noexcept;
     void reset() noexcept;
     [[nodiscard]] const NppData& host() const noexcept;
+    [[nodiscard]] std::optional<SnapshotMetadata> identity() const noexcept;
     [[nodiscard]] CaptureResult capture(OutputMode mode = OutputMode::Pretty,
         std::shared_ptr<CoreBudget> budget = {}) const noexcept;
 private:

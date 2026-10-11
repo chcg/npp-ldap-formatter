@@ -5,6 +5,29 @@ namespace ldap {
 void ScintillaGateway::initialize(NppData data) noexcept { data_ = data; uiThread_ = GetCurrentThreadId(); }
 void ScintillaGateway::reset() noexcept { data_ = NppData{}; uiThread_ = 0; }
 const NppData& ScintillaGateway::host() const noexcept { return data_; }
+std::optional<SnapshotMetadata> ScintillaGateway::identity() const noexcept {
+    if (!uiThread_ || GetCurrentThreadId() != uiThread_ || !IsWindow(data_._nppHandle)
+        || GetWindowThreadProcessId(data_._nppHandle, nullptr) != uiThread_) { return {}; }
+    int index{-1};
+    if (SendMessageW(data_._nppHandle, NPPM_GETCURRENTSCINTILLA, 0, reinterpret_cast<LPARAM>(&index)) != TRUE
+        || (index != 0 && index != 1)) { return {}; }
+    const auto view{index == 0 ? data_._scintillaMainHandle : data_._scintillaSecondHandle};
+    if (!IsWindow(view) || GetWindowThreadProcessId(view, nullptr) != uiThread_) { return {}; }
+    const auto q = [view](UINT message) { return static_cast<sptr_t>(SendMessageW(view, message, 0, 0)); };
+    (void)SendMessageW(view, SCI_SETSTATUS, SC_STATUS_OK, 0);
+    SnapshotMetadata m{};
+    m.view = view;
+    m.buffer = static_cast<uptr_t>(SendMessageW(data_._nppHandle, NPPM_GETCURRENTBUFFERID, 0, 0));
+    m.document = q(SCI_GETDOCPOINTER); m.length = q(SCI_GETLENGTH);
+    m.begin = q(SCI_GETSELECTIONSTART); m.end = q(SCI_GETSELECTIONEND);
+    m.anchor = q(SCI_GETANCHOR); m.caret = q(SCI_GETCURRENTPOS);
+    m.codepage = q(SCI_GETCODEPAGE); m.eol = q(SCI_GETEOLMODE);
+    if (!m.buffer || !m.document || m.length < 0 || m.begin < 0 || m.end < m.begin || m.end > m.length
+        || m.anchor < 0 || m.caret < 0 || m.anchor > m.length || m.caret > m.length
+        || m.begin != std::min(m.anchor, m.caret) || m.end != std::max(m.anchor, m.caret)
+        || m.eol < SC_EOL_CRLF || m.eol > SC_EOL_LF || q(SCI_GETSTATUS) != SC_STATUS_OK) { return {}; }
+    return m;
+}
 CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBudget> budget) const noexcept {
     const auto fail = [](CaptureErrorCode code, std::size_t offset = 0) -> CaptureResult {
         return {{}, CaptureError{code, offset}};

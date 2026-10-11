@@ -29,6 +29,7 @@ struct State {
     bool readonly{}, undo{true}, virtualSpace{}, badCount{}, badNul{}, changed{}, statusFailure{}, changeOnRead{};
     int changeIdentity{};
     bool copied{};
+    std::size_t copies{};
     std::optional<Sci_Position> lengthOverride{}, beginOverride{}, endOverride{};
     bool nullDocument{}, nullBuffer{}, wrongTextCapacity{};
     sptr_t status{};
@@ -74,6 +75,7 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
             if (state.statusFailure) { state.status = SC_STATUS_FAILURE; }
             if (state.changeOnRead) { state.changed = true; }
             state.copied = true;
+            ++state.copies;
         }
         return static_cast<LRESULT>(count + (message == SCI_GETSELTEXT ? 1 : 0)) + (state.badCount ? 1 : 0);
     }
@@ -202,6 +204,8 @@ int main() {
     commandMenuInit();
     pluginInit({host.handle, main.handle, second.handle});
     for (int command{}; command != 2; ++command) {
+        pluginShutdown();
+        pluginInit({host.handle, main.handle, second.handle});
         const auto originalText{state.text};
         const auto originalAnchor{state.anchor}, originalCaret{state.caret};
         state.copied = false; state.mainQueries = 0;

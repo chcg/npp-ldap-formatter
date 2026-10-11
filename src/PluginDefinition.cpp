@@ -1,17 +1,15 @@
 #include "PluginDefinition.hpp"
-#include "ScintillaGateway.hpp"
+#include "PluginController.hpp"
 #include "BuildInfo.hpp"
 #include <algorithm>
 #include <array>
 
 namespace {
 std::array<FuncItem, static_cast<std::size_t>(nbFunc)> functions{};
-ldap::ScintillaGateway gateway{};
-std::shared_ptr<ldap::CoreBudget> budget{};
+ldap::PluginController controller{};
 void capture(ldap::OutputMode mode) noexcept {
     try {
-        if (!budget) { budget = std::make_shared<ldap::CoreBudget>(); }
-        (void)gateway.capture(mode, budget);
+        controller.submit(mode);
     } catch (...) { /* No exception crosses the host ABI. */ }
 }
 void pretty() noexcept { capture(ldap::OutputMode::Pretty); }
@@ -21,7 +19,7 @@ void about() {
     // Comando del scaffold; el formateador pertenece a tickets posteriores.
     const auto version{ldap::buildVersion()};
     if (!version.empty()) {
-        MessageBoxW(gateway.host()._nppHandle,
+        MessageBoxW(controller.host()._nppHandle,
             L"LDAP Formatter 0.1.0",
             NPP_PLUGIN_NAME, MB_OK | MB_ICONINFORMATION);
     }
@@ -49,6 +47,6 @@ void commandMenuInit() noexcept {
     (void)setCommand(1, L"Compact", compact);
     (void)setCommand(2, L"Acerca de LDAP Formatter", about);
 }
-void pluginInit(NppData data) noexcept { gateway.initialize(data); }
-void pluginShutdown() noexcept { gateway.reset(); budget.reset(); }
+void pluginInit(NppData data) noexcept { controller.initialize(data); }
+void pluginShutdown() noexcept { controller.shutdown(); }
 FuncItem* pluginFunctions() noexcept { return functions.data(); }

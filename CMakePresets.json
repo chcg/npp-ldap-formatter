@@ -51,7 +51,7 @@
       "configurePreset": "win32",
       "configuration": "Release",
       "targets": [
-        "baseline_sdk_probe", "NppLdapFormatter", "plugin_abi_smoke", "ldap_parser_tests", "scintilla_gateway_tests"
+        "baseline_sdk_probe", "NppLdapFormatter", "plugin_abi_smoke", "ldap_parser_tests", "scintilla_gateway_tests", "plugin_controller_tests"
       ]
     },
     {
@@ -59,7 +59,7 @@
       "configurePreset": "x64",
       "configuration": "Release",
       "targets": [
-        "baseline_sdk_probe", "NppLdapFormatter", "plugin_abi_smoke", "ldap_parser_tests", "scintilla_gateway_tests"
+        "baseline_sdk_probe", "NppLdapFormatter", "plugin_abi_smoke", "ldap_parser_tests", "scintilla_gateway_tests", "plugin_controller_tests"
       ]
     },
     {
@@ -67,7 +67,7 @@
       "configurePreset": "arm64",
       "configuration": "Release",
       "targets": [
-        "baseline_sdk_probe", "NppLdapFormatter", "plugin_abi_smoke", "ldap_parser_tests", "scintilla_gateway_tests"
+        "baseline_sdk_probe", "NppLdapFormatter", "plugin_abi_smoke", "ldap_parser_tests", "scintilla_gateway_tests", "plugin_controller_tests"
       ]
     }
   ]
