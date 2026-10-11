@@ -22,3 +22,8 @@ _bmad/
 _bmad-output/
 *.pyc
 .uv-cache/
+
+# Archivos de contexto y wrappers locales de BMad
+AGENTS.md
+bmad-prep.cmd
+project-context/
