@@ -510,6 +510,11 @@ static_assert(sizeof(Frame) * MaxDepth + 2 * sizeof(Consumer) + sizeof(Operation
     + sizeof(Checkpoint) + sizeof(Event) + 512 <= WorkspaceBytes);
 } // namespace
 
+std::optional<ParseError> validateUtf8Bytes(std::string_view input) noexcept {
+    Checkpoint stop{};
+    return validateUtf8(input, stop);
+}
+
 ParseResult parseSimpleEquality(std::string_view input, FormatOptions options) noexcept {
     try {
         Checkpoint stop{options.stop, 0, CorePhase::Entry, options.checkpoint, options.checkpointContext};

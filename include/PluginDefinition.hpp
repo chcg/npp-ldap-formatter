@@ -4,7 +4,7 @@
 #include "PluginInterface.h"
 
 inline constexpr wchar_t NPP_PLUGIN_NAME[]{L"LDAP Formatter"};
-inline constexpr int nbFunc{1};
+inline constexpr int nbFunc{3};
 
 void commandMenuInit() noexcept;
 [[nodiscard]] bool setCommand(int index, std::wstring_view name,

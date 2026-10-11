@@ -31,11 +31,16 @@ int wmain(int argc, wchar_t* argv[]) {
     int count{};
     auto* items{funcs(&count)};
     if (unicode() != TRUE || std::wcscmp(name(), L"LDAP Formatter") != 0
-        || count != 1 || items == nullptr || items[0]._pFunc == nullptr
+        || count != 3 || items == nullptr || items[0]._pFunc == nullptr
         || items[0]._itemName[0] == L'\0' || funcs(nullptr) != nullptr) {
         return 4;
     }
     notify(nullptr);
+    if (std::wcscmp(items[0]._itemName, L"Pretty") != 0
+        || std::wcscmp(items[1]._itemName, L"Compact") != 0
+        || items[1]._pFunc == nullptr) { return 6; }
+    items[0]._pFunc();
+    items[1]._pFunc();
     SCNotification shutdown{};
     shutdown.nmhdr.code = NPPN_SHUTDOWN;
     notify(&shutdown);

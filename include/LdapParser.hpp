@@ -45,6 +45,7 @@ struct ParseResult {
 
 enum class OutputMode { Pretty, Compact };
 enum class Eol { CrLf, Lf, Cr };
+[[nodiscard]] std::optional<ParseError> validateUtf8Bytes(std::string_view input) noexcept;
 enum class CorePhase { Entry, Utf8, Attribute, MatchingRule, Value, Whitespace, Structure, Count, Copy, Publish };
 using CheckpointObserver = void (*)(CorePhase, std::size_t, void*) noexcept;
 

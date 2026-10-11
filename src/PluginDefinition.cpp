@@ -7,13 +7,22 @@
 namespace {
 std::array<FuncItem, static_cast<std::size_t>(nbFunc)> functions{};
 ldap::ScintillaGateway gateway{};
+std::shared_ptr<ldap::CoreBudget> budget{};
+void capture(ldap::OutputMode mode) noexcept {
+    try {
+        if (!budget) { budget = std::make_shared<ldap::CoreBudget>(); }
+        (void)gateway.capture(mode, budget);
+    } catch (...) { /* No exception crosses the host ABI. */ }
+}
+void pretty() noexcept { capture(ldap::OutputMode::Pretty); }
+void compact() noexcept { capture(ldap::OutputMode::Compact); }
 
 void about() {
     // Comando del scaffold; el formateador pertenece a tickets posteriores.
     const auto version{ldap::buildVersion()};
     if (!version.empty()) {
         MessageBoxW(gateway.host()._nppHandle,
-            L"LDAP Formatter 0.1.0\nScaffold C++20: Pretty/Compact pendientes.",
+            L"LDAP Formatter 0.1.0",
             NPP_PLUGIN_NAME, MB_OK | MB_ICONINFORMATION);
     }
 }
@@ -36,8 +45,10 @@ bool setCommand(int index, std::wstring_view name, PFUNCPLUGINCMD callback,
 }
 
 void commandMenuInit() noexcept {
-    (void)setCommand(0, L"Acerca de LDAP Formatter", about);
+    (void)setCommand(0, L"Pretty", pretty);
+    (void)setCommand(1, L"Compact", compact);
+    (void)setCommand(2, L"Acerca de LDAP Formatter", about);
 }
 void pluginInit(NppData data) noexcept { gateway.initialize(data); }
-void pluginShutdown() noexcept { gateway.reset(); }
+void pluginShutdown() noexcept { gateway.reset(); budget.reset(); }
 FuncItem* pluginFunctions() noexcept { return functions.data(); }
