@@ -1,4 +1,5 @@
 #include "PluginController.hpp"
+#include <algorithm>
 
 namespace ldap {
 namespace { constexpr UINT completed{WM_APP + 37}; constexpr UINT_PTR fallback{1}; }
@@ -45,12 +46,18 @@ void PluginController::start(OutputMode mode) noexcept {
 }
 void PluginController::submit(OutputMode mode) noexcept {
     if (closing_ || GetCurrentThreadId() != uiThread_) { return; }
-    ++generation_; pending_.reset(); ready_.reset(); error_.reset(); poll();
-    if (running_) {
+    ++generation_; pending_.reset(); error_.reset(); poll();
+    if (running_ || applying_) {
         cancellation_.request_stop();
         const auto identity{gateway_.identity()};
         if (!identity) { error_ = CaptureError{CaptureErrorCode::Api, 0}; }
         pending_ = identity ? std::optional<Intent>{Intent{mode, *identity}} : std::nullopt;
+        if (pending_ && applyingIdentity_) {
+            auto temporary{*applyingIdentity_};
+            if (temporary.anchor == temporary.caret) { temporary.begin = 0; temporary.end = temporary.length; }
+            temporary.anchor = temporary.begin; temporary.caret = temporary.end;
+            if (*identity == temporary) { pending_->identity = *applyingIdentity_; }
+        }
     } else { start(mode); }
 }
 void PluginController::work(std::stop_token stop) noexcept {
@@ -83,16 +90,36 @@ void PluginController::work(std::stop_token stop) noexcept {
     }
 }
 void PluginController::poll() noexcept {
-    if (closing_ || GetCurrentThreadId() != uiThread_) { return; }
+    if (closing_ || applying_ || GetCurrentThreadId() != uiThread_) { return; }
+    std::unique_ptr<FormatDelivery> delivery{};
     {
         std::lock_guard lock{mutex_};
         if (!finished_) { return; }
         finished_ = false; running_ = false;
         if (resourceFailure_ && finishedGeneration_ == generation_) { error_ = CaptureError{CaptureErrorCode::Resources, 0}; }
         resourceFailure_ = false;
-        if (mailbox_ && mailbox_->generation == generation_) { ready_ = std::move(mailbox_); }
+        if (mailbox_ && mailbox_->generation == generation_) { delivery = std::move(mailbox_); }
         mailbox_.reset();
     }
+    if (delivery) {
+        applying_ = true;
+        applyingIdentity_ = delivery->snapshot.metadata;
+        applyingIdentity_->begin = std::min(applyingIdentity_->anchor, applyingIdentity_->caret);
+        applyingIdentity_->end = std::max(applyingIdentity_->anchor, applyingIdentity_->caret);
+        if (!delivery->result.ok()) {
+            error_ = CaptureError{CaptureErrorCode::Core, delivery->result.error->offset, delivery->result.error};
+        } else {
+            struct Validity { PluginController* self; std::uint64_t generation; } validity{this, delivery->generation};
+            const auto current = [](void* context) noexcept {
+                const auto& v{*static_cast<Validity*>(context)};
+                return !v.self->closing_ && v.self->generation_ == v.generation;
+            };
+            const auto committed{gateway_.commit(delivery->snapshot, delivery->result.text, budget_, current, &validity)};
+            if (delivery->generation == generation_) { error_ = committed.error; }
+        }
+        delivery.reset(); applyingIdentity_.reset(); applying_ = false;
+    }
+    if (closing_) { return; }
     if (pending_) {
         const auto intent{*pending_}; pending_.reset();
         const auto identity{gateway_.identity()};
@@ -100,14 +127,14 @@ void PluginController::poll() noexcept {
         else if (identity == intent.identity) { start(intent.mode); }
     }
 }
-std::unique_ptr<FormatDelivery> PluginController::takeDelivery() noexcept { poll(); return std::move(ready_); }
+std::unique_ptr<FormatDelivery> PluginController::takeDelivery() noexcept { poll(); return {}; }
 void PluginController::shutdown() noexcept {
     if (closing_ && !window_ && !worker_.joinable() && !budget_ && !module_) { return; }
     closing_ = true; ++generation_; pending_.reset(); cancellation_.request_stop();
     worker_.request_stop(); wake_.notify_all();
     if (worker_.joinable()) { worker_.join(); }
     worker_ = std::jthread{};
-    job_.reset(); mailbox_.reset(); ready_.reset(); running_ = finished_ = false;
+    job_.reset(); mailbox_.reset(); running_ = finished_ = false;
     if (window_) { KillTimer(window_, fallback); DestroyWindow(window_); window_ = nullptr; }
     if (module_) { (void)UnregisterClassW(L"LdapFormatterWorker", module_); module_ = nullptr; }
     gateway_.reset(); budget_.reset(); uiThread_ = 0;

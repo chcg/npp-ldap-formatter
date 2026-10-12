@@ -5,8 +5,8 @@
 #include <vector>
 
 namespace ldap {
-enum class CaptureErrorCode { Api, DocumentChanged, UnsupportedState, Encoding, InvalidUtf8, RawNul, Length, Resources };
-struct CaptureError { CaptureErrorCode code{}; std::size_t offset{}; };
+enum class CaptureErrorCode { Api, DocumentChanged, UnsupportedState, Encoding, InvalidUtf8, RawNul, Length, Resources, Core, CommitIndeterminate };
+struct CaptureError { CaptureErrorCode code{}; std::size_t offset{}; std::optional<ParseError> core{}; };
 struct SnapshotMetadata {
     HWND view{};
     uptr_t buffer{};
@@ -33,6 +33,23 @@ struct CaptureResult {
     std::optional<CaptureError> error{};
     [[nodiscard]] bool ok() const noexcept { return snapshot.has_value(); }
 };
+struct CommitResult {
+    bool applied{};
+    std::optional<CaptureError> error{};
+    [[nodiscard]] bool ok() const noexcept { return !error; }
+};
+class ScintillaUndoGuard final {
+public:
+    explicit ScintillaUndoGuard(HWND view) noexcept;
+    ~ScintillaUndoGuard() noexcept { close(); }
+    ScintillaUndoGuard(const ScintillaUndoGuard&) = delete;
+    ScintillaUndoGuard& operator=(const ScintillaUndoGuard&) = delete;
+    void close() noexcept;
+    [[nodiscard]] bool opened() const noexcept { return opened_; }
+private:
+    HWND view_{};
+    bool opened_{};
+};
 // El host entrega handles no propietarios. Las futuras operaciones serán de hilo UI.
 class ScintillaGateway final {
 public:
@@ -42,6 +59,8 @@ public:
     [[nodiscard]] std::optional<SnapshotMetadata> identity() const noexcept;
     [[nodiscard]] CaptureResult capture(OutputMode mode = OutputMode::Pretty,
         std::shared_ptr<CoreBudget> budget = {}) const noexcept;
+    [[nodiscard]] CommitResult commit(const ScintillaSnapshot& snapshot, std::string_view output,
+        std::shared_ptr<CoreBudget> budget, bool (*current)(void*) noexcept = nullptr, void* context = nullptr) const noexcept;
 private:
     NppData data_{};
     DWORD uiThread_{};

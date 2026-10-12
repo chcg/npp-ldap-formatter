@@ -45,6 +45,15 @@
       }
     }
   ],
+  "testPresets": [
+    {
+      "name": "x64-release",
+      "configurePreset": "x64",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "timeout": 30 }
+    }
+  ],
   "buildPresets": [
     {
       "name": "win32-release",

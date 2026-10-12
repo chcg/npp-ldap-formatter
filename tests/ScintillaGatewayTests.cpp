@@ -11,10 +11,11 @@
 
 // Test executable only: fail the next allocation of an explicitly selected size.
 // The shared budget exists before arming this fault, so it targets snapshot storage.
-namespace { std::atomic<std::size_t> failAllocationSize{}; }
+namespace { std::atomic<std::size_t> failAllocationSize{}, failAllocationSkip{}; }
 _Ret_notnull_ _Post_writable_byte_size_(bytes) void* operator new(std::size_t bytes) {
     auto expected{bytes};
-    if (failAllocationSize.compare_exchange_strong(expected, 0)) { throw std::bad_alloc{}; }
+    if (failAllocationSize.load() == bytes && failAllocationSkip.load() != 0) { --failAllocationSkip; }
+    else if (failAllocationSize.compare_exchange_strong(expected, 0)) { throw std::bad_alloc{}; }
     if (auto* allocation{std::malloc(bytes == 0 ? 1 : bytes)}) { return allocation; }
     throw std::bad_alloc{};
 }
@@ -35,6 +36,14 @@ struct State {
     sptr_t status{};
     std::size_t mainQueries{}, secondQueries{}, mutations{};
     bool hostSuccess{true};
+    std::size_t begins{}, ends{}, replacements{};
+    std::vector<std::string> undoTexts{}, redoTexts{};
+    bool replaceFailure{}, postFailure{};
+    bool undoOpen{}, recordedGroup{};
+    void (*reenter)(){};
+    void (*selectionReenter)(){};
+    void (*finalSelectionReenter)(){};
+    void (*endReenter)(){};
     HWND host{}, main{}, second{};
 } state;
 LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
@@ -46,6 +55,48 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
     if (message < 2000 || message > 3000) { return DefWindowProcW(hwnd, message, w, l); }
     if (hwnd == state.main) { ++state.mainQueries; } else { ++state.secondQueries; }
     switch (message) {
+    case SCI_BEGINUNDOACTION:
+        ++state.begins; state.undoOpen = true; state.recordedGroup = false;
+        if (state.reenter) { const auto callback{state.reenter}; state.reenter = nullptr; callback(); }
+        return 0;
+    case SCI_ENDUNDOACTION:
+        ++state.ends; state.undoOpen = false;
+        if (state.endReenter) { const auto callback{state.endReenter}; state.endReenter = nullptr; callback(); }
+        return 0;
+    case SCI_SETSEL:
+        state.anchor = static_cast<Sci_Position>(w); state.caret = l;
+        if (state.selectionReenter) { const auto callback{state.selectionReenter}; state.selectionReenter = nullptr; callback(); }
+        if (state.recordedGroup && state.finalSelectionReenter) { const auto callback{state.finalSelectionReenter}; state.finalSelectionReenter = nullptr; callback(); }
+        return 0;
+    case SCI_GETTEXTRANGEFULL: {
+        auto& range{*reinterpret_cast<Sci_TextRangeFull*>(l)};
+        const auto size{static_cast<std::size_t>(range.chrg.cpMax - range.chrg.cpMin)};
+        std::memcpy(range.lpstrText, state.text.data() + range.chrg.cpMin, size);
+        range.lpstrText[size] = '\0';
+        if (state.statusFailure) { state.status = SC_STATUS_FAILURE; }
+        if (state.changeOnRead) { state.changed = true; }
+        return static_cast<LRESULT>(size) + (state.badCount ? 1 : 0);
+    }
+    case SCI_REPLACESEL: {
+        ++state.replacements;
+        // Without an explicit group an adjacent edit coalesces with the preceding
+        // action; BEGIN creates the boundary that this story must preserve.
+        if ((state.undoOpen && !state.recordedGroup) || state.undoTexts.empty()) { state.undoTexts.push_back(state.text); }
+        state.recordedGroup = true; state.redoTexts.clear();
+        const auto begin{std::min(state.anchor, state.caret)};
+        const auto size{std::max(state.anchor, state.caret) - begin};
+        state.text.replace(static_cast<std::size_t>(begin), static_cast<std::size_t>(size), reinterpret_cast<const char*>(l));
+        state.anchor = state.caret = begin + static_cast<Sci_Position>(std::strlen(reinterpret_cast<const char*>(l)));
+        if (state.replaceFailure) { state.status = SC_STATUS_FAILURE; }
+        if (state.postFailure) { state.text[static_cast<std::size_t>(begin)] = 'X'; }
+        return 0;
+    }
+    case SCI_UNDO:
+        if (!state.undoTexts.empty()) { state.redoTexts.push_back(state.text); state.text = state.undoTexts.back(); state.undoTexts.pop_back(); }
+        return 0;
+    case SCI_REDO:
+        if (!state.redoTexts.empty()) { state.undoTexts.push_back(state.text); state.text = state.redoTexts.back(); state.redoTexts.pop_back(); }
+        return 0;
     case SCI_SETSTATUS: state.status = static_cast<sptr_t>(w); return 0;
     case SCI_GETSTATUS: return state.status;
     case SCI_GETDOCPOINTER: return state.nullDocument ? 0 : 123 + (state.copied && state.changeIdentity == 1 ? 1 : 0);
@@ -218,6 +269,126 @@ int main() {
     pluginFunctions()[0]._pFunc(); pluginFunctions()[1]._pFunc();
     check(!state.copied);
     check(!state.wrongTextCapacity);
+    state.active = 0;
+    state.text = "prefix (&(cn=a)(sn=b)) suffix";
+    state.anchor = 7; state.caret = 22;
+    state.undoTexts = {"previous independent edit"};
+    const auto original{state.text};
+    { auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+      check(captured.ok());
+      if (captured.ok()) {
+        const auto formatted{ldap::formatFilter(captured.snapshot->text())};
+        const auto commit{gateway.commit(*captured.snapshot, formatted.text, budget)};
+        check(commit.ok() && commit.applied && state.replacements == 1 && state.begins == 1 && state.ends == 1);
+        const auto post{state.text};
+        SendMessageW(main.handle, SCI_UNDO, 0, 0); check(state.text == original);
+        SendMessageW(main.handle, SCI_UNDO, 0, 0); check(state.text == "previous independent edit");
+        SendMessageW(main.handle, SCI_REDO, 0, 0); check(state.text == original);
+        SendMessageW(main.handle, SCI_REDO, 0, 0); check(state.text == post);
+      } }
+    for (int view{}; view != 2; ++view) {
+      for (const auto mode : {ldap::OutputMode::Pretty, ldap::OutputMode::Compact}) {
+        for (int direction{}; direction != 3; ++direction) {
+          state.active = view;
+          state.text = direction == 2 ? "( & (cn=a) (sn=b) )" : "pre ( & (cn=a) (sn=b) ) post";
+          const auto begin{direction == 2 ? Sci_Position{} : Sci_Position{4}};
+          const auto end{direction == 2 ? static_cast<Sci_Position>(state.text.size()) : static_cast<Sci_Position>(state.text.size() - 5)};
+          state.anchor = direction == 0 ? begin : direction == 1 ? end : 3;
+          state.caret = direction == 0 ? end : direction == 1 ? begin : 3;
+          auto captured{gateway.capture(mode, budget)};
+          check(captured.ok());
+          if (!captured.ok()) { continue; }
+          ldap::FormatOptions options{}; options.mode = mode;
+          auto formatted{ldap::formatFilter(captured.snapshot->text(), options)};
+          const auto outside{state.text.substr(0, static_cast<std::size_t>(begin)) + std::string{formatted.text} + state.text.substr(static_cast<std::size_t>(end))};
+          const auto replacements{state.replacements}, begins{state.begins}, ends{state.ends};
+          const auto result{gateway.commit(*captured.snapshot, formatted.text, budget)};
+          check(result.ok() && result.applied && state.text == outside && state.replacements == replacements + 1
+            && state.begins == begins + 1 && state.ends == ends + 1);
+          const auto outputEnd{begin + static_cast<Sci_Position>(formatted.text.size())};
+          check(state.anchor == (direction == 1 ? outputEnd : begin) && state.caret == (direction == 1 ? begin : outputEnd));
+        }
+      }
+    }
+    state.active = 0;
+    const auto resetCommit = [&] { state.text = "( & (cn=a) (sn=b) )"; state.anchor = state.caret = 3; };
+    const auto rejectedCommit = [&](auto change, ldap::CaptureErrorCode code) {
+        resetCommit(); auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+        change(); const auto prior{state.text}; const auto anchor{state.anchor}, caret{state.caret};
+        const auto count{state.replacements}, begins{state.begins};
+        auto result{gateway.commit(*captured.snapshot, "(&(cn=a)(sn=b))", budget)};
+        check(!result.ok() && result.error->code == code && state.text == prior && state.anchor == anchor && state.caret == caret
+            && state.replacements == count && state.begins == begins);
+    };
+    rejectedCommit([] { state.text[7] = 'z'; }, ldap::CaptureErrorCode::DocumentChanged);
+    rejectedCommit([] { state.anchor = 4; }, ldap::CaptureErrorCode::DocumentChanged);
+    rejectedCommit([] { state.active = 1; }, ldap::CaptureErrorCode::DocumentChanged); state.active = 0;
+    rejectedCommit([] { state.readonly = true; }, ldap::CaptureErrorCode::UnsupportedState); state.readonly = false;
+    rejectedCommit([] { state.undo = false; }, ldap::CaptureErrorCode::UnsupportedState); state.undo = true;
+    rejectedCommit([] { state.selections = 2; }, ldap::CaptureErrorCode::UnsupportedState); state.selections = 1;
+    rejectedCommit([] { state.selectionMode = SC_SEL_RECTANGLE; }, ldap::CaptureErrorCode::UnsupportedState); state.selectionMode = SC_SEL_STREAM;
+    rejectedCommit([] { state.virtualSpace = true; }, ldap::CaptureErrorCode::UnsupportedState); state.virtualSpace = false;
+    rejectedCommit([] { state.badCount = true; }, ldap::CaptureErrorCode::Api); state.badCount = false;
+    rejectedCommit([] { state.statusFailure = true; }, ldap::CaptureErrorCode::Api); state.statusFailure = false;
+    rejectedCommit([] { state.changeOnRead = true; }, ldap::CaptureErrorCode::DocumentChanged); state.changeOnRead = state.changed = false;
+    resetCommit();
+    { auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+      const auto count{state.replacements}, begins{state.begins};
+      auto noop{gateway.commit(*captured.snapshot, captured.snapshot->text(), budget)};
+      check(noop.ok() && !noop.applied && state.replacements == count && state.begins == begins);
+      { auto constrained{budget->reserve(budget->remaining() - (captured.snapshot->text().size() + 1))};
+        auto limitedNoop{gateway.commit(*captured.snapshot, captured.snapshot->text(), budget)};
+        check(limitedNoop.ok() && !limitedNoop.applied && state.replacements == count && state.begins == begins); }
+      for (const auto output : {std::string{"bad\xc0\xaf"}, std::string{"a\0b", 3}, std::string(ldap::MaxOutputBytes + 1, 'a')}) {
+        check(!gateway.commit(*captured.snapshot, output, budget).ok());
+      }
+      { auto exhausted{budget->reserve(budget->remaining())}; check(!gateway.commit(*captured.snapshot, "(cn=a)", budget).ok()); }
+      check(state.replacements == count && state.begins == begins); }
+    for (int fault{}; fault != 2; ++fault) {
+      resetCommit(); auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+      state.replaceFailure = fault == 0; state.postFailure = fault == 1;
+      const auto count{state.replacements}, begins{state.begins}, ends{state.ends};
+      const auto result{gateway.commit(*captured.snapshot, "(&(cn=a)(sn=b))", budget)};
+      check(result.error && result.error->code == ldap::CaptureErrorCode::CommitIndeterminate
+          && state.replacements == count + 1 && state.begins == begins + 1 && state.ends == ends + 1);
+      state.replaceFailure = state.postFailure = false;
+    }
+    const auto guardBegins{state.begins}, guardEnds{state.ends};
+    { ldap::ScintillaUndoGuard guard{main.handle}; guard.close(); guard.close(); }
+    try { ldap::ScintillaUndoGuard guard{main.handle}; throw 1; } catch (int) {}
+    [&] { ldap::ScintillaUndoGuard guard{main.handle}; return; }();
+    check(state.begins == guardBegins + 3 && state.ends == guardEnds + 3);
+    resetCommit();
+    { auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+      state.selectionReenter = [] { state.text[7] = 'z'; };
+      const auto edits{state.replacements};
+      const auto result{gateway.commit(*captured.snapshot, "(&(cn=a)(sn=b))", budget)};
+      check(result.error && result.error->code == ldap::CaptureErrorCode::DocumentChanged && state.replacements == edits
+          && state.anchor == 3 && state.caret == 3); }
+    for (int stage{}; stage != 2; ++stage) {
+      for (int changed{}; changed != 3; ++changed) {
+        resetCommit(); auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+        void (*callback)(){changed == 0 ? +[] { state.text[7] = 'z'; }
+            : changed == 1 ? +[] { state.nullDocument = true; } : +[] { state.anchor = 1; }};
+        if (stage == 0) { state.finalSelectionReenter = callback; } else { state.endReenter = callback; }
+        const auto edits{state.replacements}, begins{state.begins}, ends{state.ends};
+        const auto result{gateway.commit(*captured.snapshot, "(&(cn=a)(sn=b))", budget)};
+        check(result.error && result.error->code == ldap::CaptureErrorCode::CommitIndeterminate
+            && state.replacements == edits + 1 && state.begins == begins + 1 && state.ends == ends + 1);
+        state.nullDocument = false;
+      }
+    }
+    for (int allocation{}; allocation != 3; ++allocation) {
+      resetCommit(); auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+      const auto owned{budget->used()}, edits{state.replacements}, begins{state.begins}, ends{state.ends};
+      const auto originalText{state.text}; const auto undo{state.undoTexts}, redo{state.redoTexts};
+      failAllocationSize = allocation == 0 ? captured.snapshot->text().size() + 1 : std::string_view{"(&(cn=a)(sn=b))"}.size() + 1;
+      failAllocationSkip = allocation == 2 ? 1 : 0;
+      const auto result{gateway.commit(*captured.snapshot, "(&(cn=a)(sn=b))", budget)};
+      check(result.error && result.error->code == ldap::CaptureErrorCode::Resources && failAllocationSize == 0
+          && state.text == originalText && state.anchor == 3 && state.caret == 3 && state.undoTexts == undo && state.redoTexts == redo
+          && state.replacements == edits && state.begins == begins && state.ends == ends && budget->used() == owned);
+    }
     gateway.reset(); rejected(ldap::CaptureErrorCode::Api);
     std::cout << "Gateway simulated host: " << failures << " failures\n";
     return failures == 0 ? 0 : 3;
