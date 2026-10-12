@@ -110,7 +110,7 @@ CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBud
     } catch (...) { return fail(CaptureErrorCode::Resources); }
 }
 CommitResult ScintillaGateway::commit(const ScintillaSnapshot& snapshot, std::string_view output,
-    std::shared_ptr<CoreBudget> budget, bool (*current)(void*) noexcept, void* context) const noexcept {
+    std::shared_ptr<CoreBudget> budget, bool (*current)(void*) noexcept, void* context, int undoToken) const noexcept {
     bool mutated{};
     const auto fail = [&](CaptureErrorCode code, std::size_t offset = 0) -> CommitResult {
         return {false, CaptureError{mutated ? CaptureErrorCode::CommitIndeterminate : code, offset}};
@@ -197,6 +197,15 @@ CommitResult ScintillaGateway::commit(const ScintillaSnapshot& snapshot, std::st
                 (void)q(SCI_SETSEL, static_cast<uptr_t>(m.anchor), m.caret);
             }
             return fail(CaptureErrorCode::DocumentChanged);
+        }
+        // Container action is deliberately non-coalescing and belongs to this
+        // same undo group. All preflight and storage preparation precede it.
+        if (undoToken > 0) {
+            (void)q(SCI_ADDUNDOACTION, static_cast<uptr_t>(undoToken), UNDO_NONE);
+            if (q(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::CommitIndeterminate); }
+            if (identity() != expectedIdentity || !supported() || (current && !current(context))) {
+                return fail(CaptureErrorCode::CommitIndeterminate);
+            }
         }
         mutated = true;
         (void)q(SCI_REPLACESEL, 0, reinterpret_cast<sptr_t>(terminated.data()));

@@ -17,9 +17,7 @@ extern "C" __declspec(dllexport) FuncItem* getFuncsArray(int* count) {
     return pluginFunctions();
 }
 extern "C" __declspec(dllexport) void beNotified(SCNotification* notification) {
-    if (notification != nullptr && notification->nmhdr.code == NPPN_SHUTDOWN) {
-        pluginShutdown();
-    }
+    pluginNotified(notification);
 }
 extern "C" __declspec(dllexport) LRESULT messageProc(UINT, WPARAM, LPARAM) {
     return TRUE;

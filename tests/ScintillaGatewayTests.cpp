@@ -38,6 +38,22 @@ struct State {
     bool hostSuccess{true};
     std::size_t begins{}, ends{}, replacements{};
     std::vector<std::string> undoTexts{}, redoTexts{};
+    std::vector<int> undoTokens{}, redoTokens{};
+    int pendingToken{};
+    bool containerFirst{}, registerFlags{true};
+    std::size_t registrations{}, addedTokens{};
+    std::size_t selectionSets{};
+    bool pumpContainer{};
+    bool addTokenFailure{}, historyStatusFailure{};
+    std::optional<sptr_t> undoCountOverride{}, undoCursorOverride{};
+    sptr_t secondDocument{123};
+    void (*tokenReenter)(){};
+    void (*documentReenter)(){};
+    std::size_t documentReenterSkip{};
+    void (*statusReenter)(){};
+    void (*pump)(){};
+    int registeredFlags{};
+    void (*notify)(const SCNotification*){};
     bool replaceFailure{}, postFailure{};
     bool undoOpen{}, recordedGroup{};
     void (*reenter)(){};
@@ -52,11 +68,21 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
         return state.hostSuccess ? TRUE : FALSE;
     }
     if (message == NPPM_GETCURRENTBUFFERID) { return state.nullBuffer ? 0 : 42 + (state.copied && state.changeIdentity == 2 ? 1 : 0); }
+    if (message == NPPM_ADDSCNMODIFIEDFLAGS) { ++state.registrations; state.registeredFlags = static_cast<int>(l); return state.registerFlags ? TRUE : FALSE; }
     if (message < 2000 || message > 3000) { return DefWindowProcW(hwnd, message, w, l); }
     if (hwnd == state.main) { ++state.mainQueries; } else { ++state.secondQueries; }
     switch (message) {
+    case SCI_GETUNDOACTIONS:
+        if (state.historyStatusFailure) { state.status = SC_STATUS_FAILURE; }
+        return state.undoCountOverride.value_or(static_cast<sptr_t>(state.undoTexts.size() + state.redoTexts.size()));
+    case SCI_GETUNDOCURRENT: return state.undoCursorOverride.value_or(static_cast<sptr_t>(state.undoTexts.size()));
+    case SCI_ADDUNDOACTION:
+        state.pendingToken = static_cast<int>(w); ++state.addedTokens;
+        if (state.addTokenFailure) { state.status = SC_STATUS_FAILURE; }
+        if (state.tokenReenter) { const auto callback{state.tokenReenter}; state.tokenReenter = nullptr; callback(); }
+        return 0;
     case SCI_BEGINUNDOACTION:
-        ++state.begins; state.undoOpen = true; state.recordedGroup = false;
+        ++state.begins; state.undoOpen = true; state.recordedGroup = false; state.pendingToken = 0;
         if (state.reenter) { const auto callback{state.reenter}; state.reenter = nullptr; callback(); }
         return 0;
     case SCI_ENDUNDOACTION:
@@ -64,6 +90,7 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
         if (state.endReenter) { const auto callback{state.endReenter}; state.endReenter = nullptr; callback(); }
         return 0;
     case SCI_SETSEL:
+        ++state.selectionSets;
         state.anchor = static_cast<Sci_Position>(w); state.caret = l;
         if (state.selectionReenter) { const auto callback{state.selectionReenter}; state.selectionReenter = nullptr; callback(); }
         if (state.recordedGroup && state.finalSelectionReenter) { const auto callback{state.finalSelectionReenter}; state.finalSelectionReenter = nullptr; callback(); }
@@ -81,8 +108,10 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
         ++state.replacements;
         // Without an explicit group an adjacent edit coalesces with the preceding
         // action; BEGIN creates the boundary that this story must preserve.
-        if ((state.undoOpen && !state.recordedGroup) || state.undoTexts.empty()) { state.undoTexts.push_back(state.text); }
-        state.recordedGroup = true; state.redoTexts.clear();
+        if ((state.undoOpen && !state.recordedGroup) || state.undoTexts.empty()) {
+            state.undoTokens.resize(state.undoTexts.size()); state.undoTexts.push_back(state.text); state.undoTokens.push_back(state.pendingToken);
+        }
+        state.recordedGroup = true; state.redoTexts.clear(); state.redoTokens.clear();
         const auto begin{std::min(state.anchor, state.caret)};
         const auto size{std::max(state.anchor, state.caret) - begin};
         state.text.replace(static_cast<std::size_t>(begin), static_cast<std::size_t>(size), reinterpret_cast<const char*>(l));
@@ -92,14 +121,42 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
         return 0;
     }
     case SCI_UNDO:
-        if (!state.undoTexts.empty()) { state.redoTexts.push_back(state.text); state.text = state.undoTexts.back(); state.undoTexts.pop_back(); }
+    case SCI_REDO: {
+        const bool undo{message == SCI_UNDO};
+        auto& source{undo ? state.undoTexts : state.redoTexts};
+        auto& destination{undo ? state.redoTexts : state.undoTexts};
+        auto& tokens{undo ? state.undoTokens : state.redoTokens};
+        auto& destinationTokens{undo ? state.redoTokens : state.undoTokens};
+        if (source.empty()) { return 0; }
+        tokens.resize(source.size()); const auto token{tokens.back()};
+        const auto callback = [&](int flags, int callbackToken) {
+            if (!state.notify) { return; }
+            SCNotification notification{}; notification.nmhdr.hwndFrom = hwnd; notification.nmhdr.code = SCN_MODIFIED;
+            notification.modificationType = flags | (undo ? SC_PERFORMED_UNDO : SC_PERFORMED_REDO);
+            notification.token = callbackToken; state.notify(&notification);
+        };
+        if (state.containerFirst) { callback(SC_MOD_CONTAINER, token); }
+        destination.push_back(state.text); destinationTokens.resize(destination.size() - 1); destinationTokens.push_back(token);
+        state.text = source.back(); source.pop_back(); tokens.pop_back();
+        // Simulate the host's native caret adjustment after its callbacks.
+        state.anchor = state.caret = 0;
+        callback(SC_MOD_INSERTTEXT | SC_LASTSTEPINUNDOREDO, 0);
+        if (!state.containerFirst) {
+            if (state.pumpContainer) { state.statusReenter = state.pump; }
+            callback(SC_MOD_CONTAINER, token);
+        }
+        state.anchor = state.caret = static_cast<Sci_Position>(state.text.size());
         return 0;
-    case SCI_REDO:
-        if (!state.redoTexts.empty()) { state.undoTexts.push_back(state.text); state.text = state.redoTexts.back(); state.redoTexts.pop_back(); }
-        return 0;
+    }
     case SCI_SETSTATUS: state.status = static_cast<sptr_t>(w); return 0;
-    case SCI_GETSTATUS: return state.status;
-    case SCI_GETDOCPOINTER: return state.nullDocument ? 0 : 123 + (state.copied && state.changeIdentity == 1 ? 1 : 0);
+    case SCI_GETSTATUS:
+        if (state.statusReenter) { const auto callback{state.statusReenter}; state.statusReenter = nullptr; callback(); }
+        return state.status;
+    case SCI_GETDOCPOINTER:
+        if (state.documentReenter && !state.documentReenterSkip) {
+            const auto callback{state.documentReenter}; state.documentReenter = nullptr; callback();
+        } else if (state.documentReenter) { --state.documentReenterSkip; }
+        return state.nullDocument ? 0 : (hwnd == state.second ? state.secondDocument : 123) + (state.copied && state.changeIdentity == 1 ? 1 : 0);
     case SCI_GETLENGTH: return state.lengthOverride.value_or(static_cast<Sci_Position>(state.text.size()) + (state.changed ? 1 : 0));
     case SCI_GETANCHOR: return state.anchor;
     case SCI_GETCURRENTPOS: return state.caret;
@@ -257,6 +314,7 @@ int main() {
     for (int command{}; command != 2; ++command) {
         pluginShutdown();
         pluginInit({host.handle, main.handle, second.handle});
+        SCNotification ready{}; ready.nmhdr.hwndFrom = host.handle; ready.nmhdr.code = NPPN_READY; pluginNotified(&ready);
         const auto originalText{state.text};
         const auto originalAnchor{state.anchor}, originalCaret{state.caret};
         state.copied = false; state.mainQueries = 0;
@@ -352,6 +410,17 @@ int main() {
       check(result.error && result.error->code == ldap::CaptureErrorCode::CommitIndeterminate
           && state.replacements == count + 1 && state.begins == begins + 1 && state.ends == ends + 1);
       state.replaceFailure = state.postFailure = false;
+    }
+    // Positive container insertion itself can fail or change the document.
+    for (int fault{}; fault != 2; ++fault) {
+        resetCommit(); auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+        const auto originalText{state.text}; const auto edits{state.replacements}, begins{state.begins}, ends{state.ends};
+        state.addTokenFailure = fault == 0;
+        if (fault == 1) { state.tokenReenter = [] { state.nullDocument = true; }; }
+        const auto result{gateway.commit(*captured.snapshot, "(&(cn=a)(sn=b))", budget, nullptr, nullptr, 101 + fault)};
+        check(result.error && result.error->code == ldap::CaptureErrorCode::CommitIndeterminate
+            && state.text == originalText && state.replacements == edits && state.begins == begins + 1 && state.ends == ends + 1);
+        state.addTokenFailure = false; state.nullDocument = false;
     }
     const auto guardBegins{state.begins}, guardEnds{state.ends};
     { ldap::ScintillaUndoGuard guard{main.handle}; guard.close(); guard.close(); }

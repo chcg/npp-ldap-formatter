@@ -60,7 +60,8 @@ public:
     [[nodiscard]] CaptureResult capture(OutputMode mode = OutputMode::Pretty,
         std::shared_ptr<CoreBudget> budget = {}) const noexcept;
     [[nodiscard]] CommitResult commit(const ScintillaSnapshot& snapshot, std::string_view output,
-        std::shared_ptr<CoreBudget> budget, bool (*current)(void*) noexcept = nullptr, void* context = nullptr) const noexcept;
+        std::shared_ptr<CoreBudget> budget, bool (*current)(void*) noexcept = nullptr, void* context = nullptr,
+        int undoToken = 0) const noexcept;
 private:
     NppData data_{};
     DWORD uiThread_{};

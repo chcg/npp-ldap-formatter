@@ -12,4 +12,5 @@ void commandMenuInit() noexcept;
     bool initiallyChecked = false) noexcept;
 void pluginInit(NppData data) noexcept;
 void pluginShutdown() noexcept;
+void pluginNotified(const SCNotification* notification) noexcept;
 [[nodiscard]] FuncItem* pluginFunctions() noexcept;

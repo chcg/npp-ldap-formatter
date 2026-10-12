@@ -49,4 +49,5 @@ void commandMenuInit() noexcept {
 }
 void pluginInit(NppData data) noexcept { controller.initialize(data); }
 void pluginShutdown() noexcept { controller.shutdown(); }
+void pluginNotified(const SCNotification* notification) noexcept { controller.notified(notification); }
 FuncItem* pluginFunctions() noexcept { return functions.data(); }

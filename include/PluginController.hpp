@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+#include <array>
 
 namespace ldap {
 struct FormatDelivery {
@@ -21,6 +22,20 @@ public:
     void submit(OutputMode mode) noexcept;
     void poll() noexcept;
     void shutdown() noexcept;
+    void notified(const SCNotification* notification) noexcept;
+    enum class ProbePhase { Callback, Return, Restore, Discard, Commit };
+    struct ProbeEvent {
+        std::uint64_t ordinal{}, session{};
+        UINT code{};
+        int flags{}, token{};
+        ProbePhase phase{};
+        HWND view{};
+        uptr_t buffer{};
+        sptr_t document{};
+    };
+    [[nodiscard]] const auto& probe() const noexcept { return probe_; }
+    [[nodiscard]] std::size_t probeCount() const noexcept { return probeCount_; }
+    [[nodiscard]] bool hostGateFailed() const noexcept { return hostGateFailed_; }
     // Compatibility poll: deliveries are consumed internally exactly once on UI.
     [[nodiscard]] std::unique_ptr<FormatDelivery> takeDelivery() noexcept;
     [[nodiscard]] std::optional<CaptureError> error() const noexcept { return error_; }
@@ -34,10 +49,42 @@ public:
         if (!running_) { failThread_ = threadCreation; failNotification_ = notification; }
     }
 private:
+    friend struct PluginControllerTestAccess;
     struct Intent { OutputMode mode{}; SnapshotMetadata identity{}; };
     static LRESULT CALLBACK procedure(HWND, UINT, WPARAM, LPARAM) noexcept;
     void work(std::stop_token stop) noexcept;
     void start(OutputMode mode) noexcept;
+    struct UndoRecord {
+        SnapshotMetadata before{}, after{};
+        std::uint64_t session{}, generation{};
+        int token{};
+        bool restorable{}, undone{};
+    };
+    struct RestoreBatch {
+        HWND view{};
+        uptr_t buffer{};
+        sptr_t document{};
+        std::uint64_t session{}, epoch{};
+        int token{}, direction{};
+        bool last{}, posted{}, incompatible{};
+        sptr_t terminalCursor{-1};
+    };
+    void restore() noexcept;
+    void invalidateWork() noexcept;
+    [[nodiscard]] bool observeHistory() noexcept;
+    void discardRedo(sptr_t document) noexcept;
+    void trace(UINT code, int flags, int token, ProbePhase phase, const SnapshotMetadata* scope = nullptr) noexcept;
+    std::array<std::optional<UndoRecord>, 1024> records_{};
+    std::array<ProbeEvent, 512> probe_{};
+    CoreBudget::Reservation historyStorage_{};
+    std::optional<RestoreBatch> restoreBatch_{};
+    std::size_t probeCount_{};
+    std::uint64_t ordinal_{}, session_{1}, restoreEpoch_{};
+    int nextToken_{1};
+    int restoredToken_{}, restoredDirection_{};
+    bool readyAttempted_{}, flagsReady_{}, undoRedo_{}, restoring_{}, hostGateFailed_{};
+    std::size_t notificationDepth_{};
+    bool deferredRestore_{};
     ScintillaGateway gateway_{};
     std::shared_ptr<CoreBudget> budget_{};
     std::jthread worker_{};
