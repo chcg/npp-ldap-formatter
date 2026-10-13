@@ -7,6 +7,9 @@
 namespace {
 std::array<FuncItem, static_cast<std::size_t>(nbFunc)> functions{};
 ldap::PluginController controller{};
+bool presentDiagnostic(HWND owner, const ldap::VisibleDiagnostic& diagnostic, void*) noexcept {
+    return MessageBoxW(owner, diagnostic.text.data(), L"LDAP Formatter", MB_OK | MB_ICONERROR) != 0;
+}
 void capture(ldap::OutputMode mode) noexcept {
     try {
         controller.submit(mode);
@@ -47,7 +50,8 @@ void commandMenuInit() noexcept {
     (void)setCommand(1, L"Compact", compact);
     (void)setCommand(2, L"Acerca de LDAP Formatter", about);
 }
-void pluginInit(NppData data) noexcept { controller.initialize(data); }
+void pluginInit(NppData data) noexcept { controller.setPresenter(presentDiagnostic); controller.initialize(data); }
 void pluginShutdown() noexcept { controller.shutdown(); }
 void pluginNotified(const SCNotification* notification) noexcept { controller.notified(notification); }
+PluginDiagnosticPresenter pluginSetDiagnosticPresenter(PluginDiagnosticPresenter presenter, void* context) noexcept { return controller.setPresenter(presenter, context); }
 FuncItem* pluginFunctions() noexcept { return functions.data(); }

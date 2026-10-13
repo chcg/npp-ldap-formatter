@@ -42,8 +42,10 @@ std::optional<SnapshotMetadata> ScintillaGateway::identity() const noexcept {
     return m;
 }
 CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBudget> budget) const noexcept {
-    const auto fail = [](CaptureErrorCode code, std::size_t offset = 0) -> CaptureResult {
-        return {{}, CaptureError{code, offset}};
+    std::optional<SnapshotMetadata> scope{};
+    const auto fail = [&](CaptureErrorCode code, std::size_t offset = 0) -> CaptureResult {
+        const bool input{code == CaptureErrorCode::InvalidUtf8 || code == CaptureErrorCode::RawNul || code == CaptureErrorCode::Length};
+        return {{}, CaptureError{code, offset, {}, scope, input ? ErrorPosition::Input : ErrorPosition::Unavailable}};
     };
     try {
         if (uiThread_ == 0 || GetCurrentThreadId() != uiThread_ || !IsWindow(data_._nppHandle)
@@ -81,6 +83,9 @@ CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBud
             || before.begin != std::min(before.anchor, before.caret)
             || before.end != std::max(before.anchor, before.caret)
             || before.eol < SC_EOL_CRLF || before.eol > SC_EOL_LF) { return fail(CaptureErrorCode::Api); }
+        if (query(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::Api); }
+        scope = before;
+        if (scope->anchor == scope->caret) { scope->begin = 0; scope->end = scope->length; }
         if (query(SCI_GETREADONLY) != 0 || query(SCI_GETUNDOCOLLECTION) != 1
             || query(SCI_GETSELECTIONS) != 1 || query(SCI_GETSELECTIONMODE) != SC_SEL_STREAM
             || query(SCI_GETSELECTIONNANCHORVIRTUALSPACE) != 0
@@ -113,7 +118,9 @@ CommitResult ScintillaGateway::commit(const ScintillaSnapshot& snapshot, std::st
     std::shared_ptr<CoreBudget> budget, bool (*current)(void*) noexcept, void* context, int undoToken) const noexcept {
     bool mutated{};
     const auto fail = [&](CaptureErrorCode code, std::size_t offset = 0) -> CommitResult {
-        return {false, CaptureError{mutated ? CaptureErrorCode::CommitIndeterminate : code, offset}};
+        const bool output{code == CaptureErrorCode::InvalidUtf8 || code == CaptureErrorCode::RawNul || code == CaptureErrorCode::Length};
+        return {false, CaptureError{mutated ? CaptureErrorCode::CommitIndeterminate : code, offset, {}, snapshot.metadata,
+            output ? ErrorPosition::Output : ErrorPosition::Unavailable}};
     };
     try {
         const auto& m{snapshot.metadata};

@@ -7,6 +7,7 @@
 #include <source_location>
 namespace ldap {
 struct PluginControllerTestAccess {
+    static auto exhaustBudget(PluginController& controller) { return controller.budget_->reserve(controller.budget_->remaining()); }
     static void exhaustTokens(PluginController& controller) { controller.nextToken_ = std::numeric_limits<int>::max(); }
     static void occupyRecords(PluginController& controller) {
         for (auto& record : controller.records_) { record = PluginController::UndoRecord{}; }
@@ -94,6 +95,137 @@ int main() {
         | SC_MOD_CONTAINER | SC_LASTSTEPINUNDOREDO));
     const auto registrations{state.registrations}; readyController(controller); check(state.registrations == registrations);
     const auto baseline{controller.ownedBytes()};
+    std::size_t diagnosticCount{};
+    controller.setPresenter([](HWND, const ldap::VisibleDiagnostic&, void* context) noexcept {
+        ++*static_cast<std::size_t*>(context); return true;
+    }, &diagnosticCount);
+    state.text = std::string{"\xff", 1}; state.anchor = state.caret = 0;
+    controller.submit(ldap::OutputMode::Compact);
+    check(diagnosticCount == 0); drainMessages(); check(diagnosticCount == 1);
+    drainMessages(); check(diagnosticCount == 1);
+    ldap::VisibleDiagnostic lastDiagnostic{};
+    struct Presentation { std::size_t count{}, depth{}, maximum{}; ldap::VisibleDiagnostic* last{}; bool retry{}, fail{}; } presentation{};
+    presentation.last = &lastDiagnostic;
+    controller.setPresenter([](HWND ownerWindow, const ldap::VisibleDiagnostic& diagnostic, void* context) noexcept {
+        auto& p{*static_cast<Presentation*>(context)};
+        ++p.count; ++p.depth; p.maximum = std::max(p.maximum, p.depth); *p.last = diagnostic;
+        if (ownerWindow != state.host || state.undoOpen) { std::abort(); }
+        if (p.retry) { p.retry = false; reentrantController->submit(ldap::OutputMode::Compact); drainMessages(); }
+        --p.depth; return !p.fail;
+    }, &presentation);
+    for (int rejection{}; rejection != 9; ++rejection) {
+        state.text = "\xc3\xa9 prefix (cn="; state.anchor = 10; state.caret = static_cast<Sci_Position>(state.text.size());
+        if (rejection == 1) { state.text += "\\zz)"; state.caret = static_cast<Sci_Position>(state.text.size()); }
+        if (rejection == 2) { state.text += std::string{"\xff", 1}; state.caret = static_cast<Sci_Position>(state.text.size()); }
+        if (rejection == 3) { state.text += std::string{"\0)", 2}; state.caret = static_cast<Sci_Position>(state.text.size()); }
+        if (rejection == 4) { state.readonly = true; }
+        if (rejection == 5) { state.undo = false; }
+        if (rejection == 6) { state.selections = 2; }
+        if (rejection == 7) { state.codepage = 0; }
+        if (rejection == 8) { state.badCount = true; }
+        const auto originalBytes{state.text}; const auto undoBytes{state.undoTexts}, redoBytes{state.redoTexts};
+        const auto anchorBefore{state.anchor}, caretBefore{state.caret};
+        const auto sets{state.selectionSets}, edits{state.replacements}, tokens{state.addedTokens}, countBefore{presentation.count};
+        controller.submit(ldap::OutputMode::Pretty); check(finish(controller)); drainMessages();
+        check(presentation.count == countBefore + 1 && state.text == originalBytes && state.undoTexts == undoBytes && state.redoTexts == redoBytes
+            && state.anchor == anchorBefore && state.caret == caretBefore && state.selectionSets == sets && state.replacements == edits && state.addedTokens == tokens);
+        check(lastDiagnostic.error.code == controller.error()->code && lastDiagnostic.error.offset == controller.error()->offset);
+        if (rejection == 0) {
+            check(lastDiagnostic.error.offset == 4 && lastDiagnostic.error.position == ldap::ErrorPosition::Input
+                && std::wcsstr(lastDiagnostic.text.data(), L"byte documental 14") && std::wcsstr(lastDiagnostic.text.data(), L"selección capturada"));
+        }
+        if (rejection >= 4) { check(lastDiagnostic.error.position == ldap::ErrorPosition::Unavailable && std::wcsstr(lastDiagnostic.text.data(), L"Posición no disponible")); }
+        state.readonly = false; state.undo = true; state.selections = 1; state.codepage = SC_CP_UTF8; state.badCount = false;
+    }
+    // A new successful request suppresses an older queued capture diagnostic.
+    state.text = std::string{"\xff", 1}; state.anchor = state.caret = 0;
+    controller.submit(ldap::OutputMode::Compact); const auto suppressed{presentation.count};
+    state.text = "(cn=a)"; controller.submit(ldap::OutputMode::Compact); check(finish(controller)); drainMessages();
+    check(presentation.count == suppressed);
+    // Host identity queries can themselves reenter and supersede the notice.
+    state.text = std::string{"\xff", 1}; controller.submit(ldap::OutputMode::Compact);
+    state.documentReenter = [] {
+        state.text = "(cn=a)";
+        reentrantController->submit(ldap::OutputMode::Compact);
+    };
+    drainMessages(); check(finish(controller)); drainMessages();
+    check(presentation.count == suppressed && !controller.error() && state.text == "(cn=a)");
+    state.text = std::string{"\xff", 1}; presentation.retry = true; presentation.fail = true;
+    const auto retries{presentation.count}; controller.submit(ldap::OutputMode::Compact); drainMessages();
+    check(presentation.count == retries + 2 && presentation.maximum == 1 && controller.error()->code == ldap::CaptureErrorCode::InvalidUtf8);
+    drainMessages(); check(presentation.count == retries + 2); presentation.fail = false;
+    const auto preservedRejection = [&](ldap::OutputMode mode, ldap::CaptureErrorCode code,
+        std::optional<ldap::LdapErrorCode> core, std::size_t offset, bool allocation = false) {
+        const auto original{state.text}; const auto undo{state.undoTexts}, redo{state.redoTexts};
+        const auto undoTokens{state.undoTokens}, redoTokens{state.redoTokens};
+        const auto anchor{state.anchor}, caret{state.caret};
+        const auto edits{state.replacements}, sets{state.selectionSets}, tokens{state.addedTokens}, notices{presentation.count};
+        if (allocation) { failAllocationSize = state.text.size() + 1; }
+        controller.submit(mode); check(finish(controller)); drainMessages();
+        check(presentation.count == notices + 1 && controller.error() && controller.error()->code == code
+            && controller.error()->offset == offset && lastDiagnostic.error.code == code && lastDiagnostic.error.offset == offset);
+        if (core) { check(controller.error()->core && controller.error()->core->code == *core && lastDiagnostic.error.core->code == *core); }
+        check(state.text == original && state.anchor == anchor && state.caret == caret && state.undoTexts == undo && state.redoTexts == redo
+            && state.undoTokens == undoTokens && state.redoTokens == redoTokens && state.replacements == edits && state.selectionSets == sets && state.addedTokens == tokens);
+        if (allocation) { check(failAllocationSize == 0); }
+    };
+    state.anchor = state.caret = 0;
+    state.text.clear(); // 127 NOT groups plus one leaf: depth 128.
+    for (int depth{}; depth != 127; ++depth) { state.text += "(!"; }
+    state.text += "(cn=a)"; state.text += std::string(127, ')');
+    const auto depthBoundary{state.text}; const auto depthTokens{state.addedTokens}, depthNotices{presentation.count};
+    const auto boundaryEdits{state.replacements}, boundarySets{state.selectionSets};
+    controller.submit(ldap::OutputMode::Compact); check(finish(controller)); drainMessages();
+    check(!controller.error() && state.text == depthBoundary && state.addedTokens == depthTokens && presentation.count == depthNotices);
+    check(state.anchor == 0 && state.caret == 0 && state.undoTexts.empty() && state.redoTexts.empty()
+        && state.replacements == boundaryEdits && state.selectionSets == boundarySets);
+    state.text = "(!" + depthBoundary + ")";
+    preservedRejection(ldap::OutputMode::Compact, ldap::CaptureErrorCode::Core, ldap::LdapErrorCode::DepthExceeded, 256);
+    state.text = "(cn=" + std::string(ldap::MaxInputBytes - 5, 'a') + ")";
+    const auto lengthBoundary{state.text}; const auto lengthNotices{presentation.count}, lengthTokens{state.addedTokens};
+    controller.submit(ldap::OutputMode::Compact); check(finish(controller)); drainMessages();
+    check(!controller.error() && state.text == lengthBoundary && state.addedTokens == lengthTokens && presentation.count == lengthNotices);
+    check(state.anchor == 0 && state.caret == 0 && state.undoTexts.empty() && state.redoTexts.empty()
+        && state.replacements == boundaryEdits && state.selectionSets == boundarySets);
+    state.text.push_back('a');
+    preservedRejection(ldap::OutputMode::Compact, ldap::CaptureErrorCode::Length, {}, ldap::MaxInputBytes);
+    state.text = "(|(cn=" + std::string(ldap::MaxInputBytes - 14, 'a') + ")(sn=b))";
+    const auto outputError{ldap::formatFilter(state.text)};
+    check(outputError.error && outputError.error->code == ldap::LdapErrorCode::OutputTooLarge);
+    preservedRejection(ldap::OutputMode::Pretty, ldap::CaptureErrorCode::Core, ldap::LdapErrorCode::OutputTooLarge, outputError.error->offset);
+    check(lastDiagnostic.error.position == ldap::ErrorPosition::Output && std::wcsstr(lastDiagnostic.text.data(), L"posición de entrada no disponible"));
+    std::array<wchar_t, 96> outputByte{};
+    (void)swprintf_s(outputByte.data(), outputByte.size(), L"Byte de salida %zu (desde cero, documento capturado)", outputError.error->offset);
+    check(std::wcsstr(lastDiagnostic.text.data(), outputByte.data()) && !std::wcsstr(lastDiagnostic.text.data(), L"Byte de entrada"));
+    state.text = "(cn=synthetic-sensitive-DN-credential-marker";
+    const auto sensitiveError{ldap::formatFilter(state.text)};
+    preservedRejection(ldap::OutputMode::Compact, ldap::CaptureErrorCode::Core, sensitiveError.error->code, state.text.size());
+    check(!std::wcsstr(lastDiagnostic.text.data(), L"synthetic-sensitive") && !std::wcsstr(lastDiagnostic.text.data(), L"credential-marker"));
+    state.text = "(cn=resource)";
+    preservedRejection(ldap::OutputMode::Compact, ldap::CaptureErrorCode::Resources, {}, 0, true);
+    { auto constrained{ldap::PluginControllerTestAccess::exhaustBudget(controller)};
+      preservedRejection(ldap::OutputMode::Compact, ldap::CaptureErrorCode::Resources, {}, 0); }
+    // A small valid selected filter remains eligible inside a document above 5 MiB.
+    const std::string exterior(ldap::MaxInputBytes + 1, 'p');
+    state.text = exterior + "( & (cn=a) (sn=b) )" + " suffix";
+    state.anchor = static_cast<Sci_Position>(exterior.size()); state.caret = static_cast<Sci_Position>(state.text.size() - 7);
+    const auto largeNotices{presentation.count}, largeTokens{state.addedTokens}, largeEdits{state.replacements};
+    controller.submit(ldap::OutputMode::Compact); check(finish(controller)); drainMessages();
+    check(!controller.error() && state.text == exterior + "(&(cn=a)(sn=b)) suffix" && presentation.count == largeNotices
+        && state.addedTokens == largeTokens + 1 && state.replacements == largeEdits + 1
+        && state.anchor == static_cast<Sci_Position>(exterior.size()) && state.caret == static_cast<Sci_Position>(state.text.size() - 7));
+    state.undoTexts.clear(); state.redoTexts.clear(); state.undoTokens.clear(); state.redoTokens.clear();
+    // Closing or activating a buffer invalidates an already queued diagnostic.
+    for (const auto event : {NPPN_FILEBEFORECLOSE, NPPN_BUFFERACTIVATED}) {
+        state.text = std::string{"\xff", 1}; state.anchor = state.caret = 0;
+        const auto lifecycleNotices{presentation.count}, lifecycleEdits{state.replacements}, lifecycleTokens{state.addedTokens}, lifecycleSets{state.selectionSets};
+        controller.submit(ldap::OutputMode::Compact);
+        SCNotification notification{}; notification.nmhdr.hwndFrom = host.handle; notification.nmhdr.code = event; notification.nmhdr.idFrom = 42;
+        controller.notified(&notification); drainMessages();
+        check(presentation.count == lifecycleNotices && state.text == std::string{"\xff", 1} && state.anchor == 0 && state.caret == 0
+            && state.undoTexts.empty() && state.redoTexts.empty() && state.addedTokens == lifecycleTokens
+            && state.selectionSets == lifecycleSets && state.replacements == lifecycleEdits);
+    }
     for (const bool first : {false, true}) {
         for (int view{}; view != 2; ++view) {
             for (int direction{}; direction != 3; ++direction) {
@@ -191,6 +323,34 @@ int main() {
         state.text = "( & (cn=a) (sn=b) )"; state.anchor = state.caret = 3;
         controller.initialize({host.handle, main.handle, second.handle}); readyController(controller); state.notify = notifyController;
     };
+    resetRegression(); state.text = "(cn="; state.anchor = state.caret = 0;
+    controller.submit(ldap::OutputMode::Compact); check(finish(controller)); drainMessages();
+    const auto syntaxError{controller.error()};
+    SCNotification passiveGate{}; passiveGate.nmhdr.hwndFrom = main.handle; passiveGate.nmhdr.code = SCN_MODIFIED;
+    passiveGate.modificationType = SC_MOD_CONTAINER | SC_PERFORMED_UNDO | SC_PERFORMED_REDO;
+    controller.notified(&passiveGate);
+    const auto gateNotices{presentation.count}; controller.submit(ldap::OutputMode::Compact); drainMessages();
+    check(controller.hostGateFailed() && presentation.count == gateNotices + 1 && controller.error()->core && syntaxError->core
+        && controller.error()->core->code == syntaxError->core->code && controller.error()->offset == syntaxError->offset
+        && lastDiagnostic.error.code == ldap::CaptureErrorCode::UnsupportedState && lastDiagnostic.error.hostBlocked
+        && !lastDiagnostic.error.core && std::wcsstr(lastDiagnostic.text.data(), L"bloqueado hasta reinicialización"));
+    resetRegression();
+    // observeHistory's identity query can supersede an already failed delivery.
+    state.text = "(cn="; state.anchor = state.caret = 0;
+    Barrier failedDelivery{}; controller.setCheckpoint(checkpoint, &failedDelivery);
+    controller.submit(ldap::OutputMode::Compact);
+    check(WaitForSingleObject(failedDelivery.entered.handle, 5000) == WAIT_OBJECT_0);
+    const auto staleNotices{presentation.count}, staleReplacements{state.replacements}, staleTokens{state.addedTokens}, staleSets{state.selectionSets};
+    const auto staleUndo{state.undoTexts}, staleRedo{state.redoTexts};
+    state.documentReenter = [] {
+        state.text = "(cn=a)";
+        reentrantController->submit(ldap::OutputMode::Compact);
+    };
+    SetEvent(failedDelivery.release.handle); check(finish(controller)); drainMessages();
+    check(!state.documentReenter && !controller.error() && presentation.count == staleNotices && state.text == "(cn=a)"
+        && state.anchor == 0 && state.caret == 0 && state.replacements == staleReplacements && state.addedTokens == staleTokens
+        && state.selectionSets == staleSets && state.undoTexts == staleUndo && state.redoTexts == staleRedo);
+    resetRegression();
     for (int fault{}; fault != 3; ++fault) {
         for (const bool restoring : {false, true}) {
             resetRegression();
@@ -202,7 +362,10 @@ int main() {
             if (fault == 1) { state.undoCursorOverride = -1; }
             if (fault == 2) { state.historyStatusFailure = true; }
             const auto edits{state.replacements}, sets{state.selectionSets};
+            const auto notices{presentation.count};
             if (restoring) { drainMessages(); } else { controller.submit(ldap::OutputMode::Compact); }
+            drainMessages();
+            if (!restoring) { check(presentation.count == notices + 1 && lastDiagnostic.error.code == ldap::CaptureErrorCode::Api); }
             check(controller.error() && controller.error()->code == ldap::CaptureErrorCode::Api
                 && state.replacements == edits && state.selectionSets == sets);
             state.undoCountOverride.reset(); state.undoCursorOverride.reset(); state.historyStatusFailure = false;
@@ -320,10 +483,24 @@ int main() {
         if (failure == 4) {
             SCNotification ambiguous{}; ambiguous.nmhdr.hwndFrom = main.handle; ambiguous.nmhdr.code = SCN_MODIFIED;
             ambiguous.modificationType = SC_MOD_CONTAINER | SC_PERFORMED_UNDO | SC_PERFORMED_REDO; controller.notified(&ambiguous);
-        } else { controller.submit(ldap::OutputMode::Compact); check(finish(controller)); }
+        } else {
+            const auto notices{presentation.count};
+            controller.submit(ldap::OutputMode::Compact); check(finish(controller)); drainMessages();
+            if (failure < 3) {
+                check(presentation.count == notices + 1 && lastDiagnostic.error.code == ldap::CaptureErrorCode::CommitIndeterminate
+                    && lastDiagnostic.error.position == ldap::ErrorPosition::Unavailable
+                    && std::wcsstr(lastDiagnostic.text.data(), L"Resultado no confirmable")
+                    && std::wcsstr(lastDiagnostic.text.data(), L"bloqueado hasta reinicialización"));
+            }
+        }
         state.replaceFailure = state.postFailure = false;
         const auto edits{state.replacements}; check(controller.hostGateFailed());
+        const auto gatedBytes{state.text}; const auto gatedUndo{state.undoTexts}, gatedRedo{state.redoTexts};
+        const auto gatedAnchor{state.anchor}, gatedCaret{state.caret};
+        const auto gatedTokens{state.addedTokens}, gatedSets{state.selectionSets};
         controller.submit(ldap::OutputMode::Pretty); check(state.replacements == edits && !controller.busy());
+        check(state.text == gatedBytes && state.undoTexts == gatedUndo && state.redoTexts == gatedRedo
+            && state.anchor == gatedAnchor && state.caret == gatedCaret && state.addedTokens == gatedTokens && state.selectionSets == gatedSets);
     }
     resetRegression(); state.notify = nullptr;
     for (const bool notification : {true, false}) {

@@ -13,4 +13,9 @@ void commandMenuInit() noexcept;
 void pluginInit(NppData data) noexcept;
 void pluginShutdown() noexcept;
 void pluginNotified(const SCNotification* notification) noexcept;
+namespace ldap { struct VisibleDiagnostic; }
+// Internal C++ test seam; never exported through the host ABI.
+using PluginDiagnosticPresenter = bool (*)(HWND, const ldap::VisibleDiagnostic&, void*) noexcept;
+PluginDiagnosticPresenter pluginSetDiagnosticPresenter(PluginDiagnosticPresenter presenter,
+    void* context = nullptr) noexcept;
 [[nodiscard]] FuncItem* pluginFunctions() noexcept;

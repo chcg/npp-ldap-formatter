@@ -6,7 +6,6 @@
 
 namespace ldap {
 enum class CaptureErrorCode { Api, DocumentChanged, UnsupportedState, Encoding, InvalidUtf8, RawNul, Length, Resources, Core, CommitIndeterminate };
-struct CaptureError { CaptureErrorCode code{}; std::size_t offset{}; std::optional<ParseError> core{}; };
 struct SnapshotMetadata {
     HWND view{};
     uptr_t buffer{};
@@ -14,6 +13,13 @@ struct SnapshotMetadata {
     Sci_Position length{}, begin{}, end{}, anchor{}, caret{};
     sptr_t codepage{}, eol{};
     bool operator==(const SnapshotMetadata&) const = default;
+};
+enum class ErrorPosition { Unavailable, Input, Output };
+struct CaptureError {
+    CaptureErrorCode code{}; std::size_t offset{}; std::optional<ParseError> core{};
+    std::optional<SnapshotMetadata> scope{};
+    ErrorPosition position{ErrorPosition::Unavailable};
+    bool hostBlocked{};
 };
 struct ScintillaSnapshot {
     SnapshotMetadata metadata{};

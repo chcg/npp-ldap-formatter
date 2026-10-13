@@ -6,6 +6,12 @@
 #include <array>
 
 namespace ldap {
+struct VisibleDiagnostic {
+    CaptureError error{};
+    std::array<wchar_t, 768> text{};
+};
+using DiagnosticPresenter = bool (*)(HWND, const VisibleDiagnostic&, void*) noexcept;
+[[nodiscard]] VisibleDiagnostic describeError(CaptureError error) noexcept;
 struct FormatDelivery {
     CoreBudget::Reservation storage{};
     std::uint64_t generation{};
@@ -43,6 +49,11 @@ public:
     [[nodiscard]] std::size_t ownedBytes() const noexcept { return budget_ ? budget_->used() : 0; }
     [[nodiscard]] const NppData& host() const noexcept { return gateway_.host(); }
     void setCheckpoint(CheckpointObserver observer, void* context) noexcept;
+    DiagnosticPresenter setPresenter(DiagnosticPresenter presenter, void* context = nullptr) noexcept {
+        const auto previous{presenter_};
+        presenter_ = presenter; presenterContext_ = context;
+        return previous;
+    }
     // Deterministic resource fault seams; set only while idle, on the UI thread.
     void setFailures(bool threadCreation, bool notification) noexcept {
         std::lock_guard lock{mutex_};
@@ -54,6 +65,14 @@ private:
     static LRESULT CALLBACK procedure(HWND, UINT, WPARAM, LPARAM) noexcept;
     void work(std::stop_token stop) noexcept;
     void start(OutputMode mode) noexcept;
+    void queueDiagnostic() noexcept;
+    void presentDiagnostic() noexcept;
+    struct QueuedDiagnostic { CaptureError error{}; std::uint64_t generation{}; };
+    std::optional<QueuedDiagnostic> diagnostic_{};
+    DiagnosticPresenter presenter_{};
+    void* presenterContext_{};
+    std::uint64_t diagnosedGeneration_{};
+    bool presenting_{}, requested_{};
     struct UndoRecord {
         SnapshotMetadata before{}, after{};
         std::uint64_t session{}, generation{};

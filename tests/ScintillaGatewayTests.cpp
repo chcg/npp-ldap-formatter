@@ -1,5 +1,6 @@
 #include "ScintillaGateway.hpp"
 #include "PluginDefinition.hpp"
+#include "PluginController.hpp"
 #include <algorithm>
 #include <cstring>
 #include <iostream>
@@ -8,6 +9,8 @@
 #include <cstdlib>
 #include <new>
 #include <atomic>
+#include <array>
+#include <cwchar>
 
 // Test executable only: fail the next allocation of an explicitly selected size.
 // The shared budget exists before arming this fault, so it targets snapshot storage.
@@ -62,6 +65,26 @@ struct State {
     void (*endReenter)(){};
     HWND host{}, main{}, second{};
 } state;
+struct MenuDiagnosticObservation {
+    std::size_t count{};
+    HWND owner{};
+    ldap::CaptureError error{};
+    std::array<wchar_t, 768> text{};
+};
+bool observeMenuDiagnostic(HWND owner, const ldap::VisibleDiagnostic& diagnostic, void* context) noexcept {
+    auto& observation{*static_cast<MenuDiagnosticObservation*>(context)};
+    ++observation.count; observation.owner = owner;
+    observation.error = diagnostic.error; observation.text = diagnostic.text;
+    return true;
+}
+struct MenuPresenterGuard {
+    PluginDiagnosticPresenter previous{};
+    explicit MenuPresenterGuard(MenuDiagnosticObservation& observation) noexcept
+        : previous{pluginSetDiagnosticPresenter(observeMenuDiagnostic, &observation)} {}
+    ~MenuPresenterGuard() { (void)pluginSetDiagnosticPresenter(previous); }
+    MenuPresenterGuard(const MenuPresenterGuard&) = delete;
+    MenuPresenterGuard& operator=(const MenuPresenterGuard&) = delete;
+};
 LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
     if (message == NPPM_GETCURRENTSCINTILLA) {
         *reinterpret_cast<int*>(l) = state.active + (state.copied && state.changeIdentity == 3 ? 1 : 0);
@@ -226,9 +249,14 @@ int main() {
           && result.snapshot->text() == std::string_view{state.text}.substr(1, 8)); }
     const auto rejected = [&](ldap::CaptureErrorCode code) {
         const auto usedBefore{budget->used()};
+        const auto original{state.text}; const auto anchor{state.anchor}, caret{state.caret};
+        const auto history{state.undoTexts}, redo{state.redoTexts};
+        const auto edits{state.replacements}, tokens{state.addedTokens};
         auto result{gateway.capture(ldap::OutputMode::Pretty, budget)};
         check(!result.ok() && result.error && result.error->code == code);
         check(budget->used() == usedBefore);
+        check(state.text == original && state.anchor == anchor && state.caret == caret
+            && state.undoTexts == history && state.redoTexts == redo && state.replacements == edits && state.addedTokens == tokens);
     };
     state.anchor = state.caret = 0;
     const auto malformed = [&] {
@@ -293,7 +321,9 @@ int main() {
       std::thread worker{[&] { result = gateway.capture(ldap::OutputMode::Pretty, budget); }};
       worker.join(); check(!result.ok() && result.error->code == ldap::CaptureErrorCode::Api); }
     state.text = "ab\xc0\xaf"; rejected(ldap::CaptureErrorCode::InvalidUtf8);
-    { auto result{gateway.capture(ldap::OutputMode::Pretty, budget)}; check(result.error && result.error->offset == 2); }
+    { auto result{gateway.capture(ldap::OutputMode::Pretty, budget)};
+      check(result.error && result.error->offset == 2 && result.error->scope && result.error->scope->begin == 0
+          && result.error->position == ldap::ErrorPosition::Input); }
     state.text = std::string{"a\0b", 3}; rejected(ldap::CaptureErrorCode::RawNul);
     { auto result{gateway.capture(ldap::OutputMode::Pretty, budget)}; check(result.error && result.error->offset == 1); }
     state.text.assign(77, 'a');
@@ -327,6 +357,34 @@ int main() {
     pluginFunctions()[0]._pFunc(); pluginFunctions()[1]._pFunc();
     check(!state.copied);
     check(!state.wrongTextCapacity);
+    // Verify default production registration before observing menu delivery at
+    // its deterministic presenter boundary. No native-host certification here.
+    for (int command{}; command != 2; ++command) {
+        state.text = "pre (cn=" + std::string{"\xff", 1} + ")";
+        state.anchor = 4; state.caret = static_cast<Sci_Position>(state.text.size());
+        const auto originalText{state.text}; const auto anchor{state.anchor}, caret{state.caret};
+        const auto undo{state.undoTexts}, redo{state.redoTexts};
+        const auto edits{state.replacements}, tokens{state.addedTokens}, sets{state.selectionSets};
+        pluginInit({host.handle, main.handle, second.handle});
+        SCNotification ready{}; ready.nmhdr.hwndFrom = host.handle; ready.nmhdr.code = NPPN_READY; pluginNotified(&ready);
+        MenuDiagnosticObservation observation{};
+        {
+            const MenuPresenterGuard presenter{observation};
+            check(presenter.previous != nullptr);
+            pluginFunctions()[command]._pFunc(); check(observation.count == 0);
+            MSG message{};
+            while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) { DispatchMessageW(&message); }
+            check(observation.count == 1 && observation.owner == host.handle
+                && observation.error.code == ldap::CaptureErrorCode::InvalidUtf8 && observation.error.offset == 4
+                && observation.error.position == ldap::ErrorPosition::Input && observation.error.scope
+                && observation.error.scope->begin == 4
+                && std::wcsstr(observation.text.data(), L"UTF-8 inválido [InvalidUtf8]")
+                && std::wcsstr(observation.text.data(), L"Byte de entrada 4 (desde cero, selección capturada); byte documental 8"));
+        }
+        check(state.text == originalText && state.anchor == anchor && state.caret == caret && state.undoTexts == undo && state.redoTexts == redo
+            && state.replacements == edits && state.addedTokens == tokens && state.selectionSets == sets);
+        pluginShutdown();
+    }
     state.active = 0;
     state.text = "prefix (&(cn=a)(sn=b)) suffix";
     state.anchor = 7; state.caret = 22;

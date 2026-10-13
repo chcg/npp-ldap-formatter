@@ -66,10 +66,13 @@ int wmain(int argc, wchar_t* argv[]) {
         || items[1]._pFunc == nullptr) { return 6; }
     items[0]._pFunc();
     items[1]._pFunc();
+    // Shutdown invalidates queued diagnostics before the harness pumps UI.
     SCNotification shutdown{};
     shutdown.nmhdr.code = NPPN_SHUTDOWN;
     shutdown.nmhdr.hwndFrom = host.handle;
     notify(&shutdown);
+    MSG pending{};
+    while (PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) { DispatchMessageW(&pending); }
     notify(&ready); if (registrations != 1) { return 10; }
     if (message(0, 0, 0) != TRUE) { return 5; }
     std::cout << "ABI UTF-16, exportaciones, menu y ciclo de vida verificados\n";
