@@ -18,15 +18,33 @@ void ScintillaUndoGuard::close() noexcept {
 void ScintillaGateway::initialize(NppData data) noexcept { data_ = data; uiThread_ = GetCurrentThreadId(); }
 void ScintillaGateway::reset() noexcept { data_ = NppData{}; uiThread_ = 0; }
 const NppData& ScintillaGateway::host() const noexcept { return data_; }
+sptr_t ScintillaGateway::message(HWND view, UINT code, uptr_t w, sptr_t l) noexcept {
+    return static_cast<sptr_t>(SendMessageW(view, code, static_cast<WPARAM>(w), static_cast<LPARAM>(l)));
+}
+bool ScintillaGateway::validMetadata(const SnapshotMetadata& m) noexcept {
+    return m.buffer && m.document && m.length >= 0 && m.begin >= 0 && m.end >= m.begin && m.end <= m.length
+        && m.anchor >= 0 && m.caret >= 0 && m.anchor <= m.length && m.caret <= m.length
+        && m.begin == std::min(m.anchor, m.caret) && m.end == std::max(m.anchor, m.caret)
+        && m.eol >= SC_EOL_CRLF && m.eol <= SC_EOL_LF;
+}
+bool ScintillaGateway::canRestoreSelection(const SnapshotMetadata& observed, const SnapshotMetadata& original) noexcept {
+    return observed.view == original.view && observed.buffer == original.buffer
+        && observed.document == original.document && observed.length == original.length
+        && observed.anchor == original.begin && observed.caret == original.end;
+}
+HWND ScintillaGateway::activeView() const noexcept {
+    int index{-1};
+    if (SendMessageW(data_._nppHandle, NPPM_GETCURRENTSCINTILLA, 0, reinterpret_cast<LPARAM>(&index)) != TRUE
+        || (index != 0 && index != 1)) { return nullptr; }
+    return index == 0 ? data_._scintillaMainHandle : data_._scintillaSecondHandle;
+}
 std::optional<SnapshotMetadata> ScintillaGateway::identity() const noexcept {
     if (!uiThread_ || GetCurrentThreadId() != uiThread_ || !IsWindow(data_._nppHandle)
         || GetWindowThreadProcessId(data_._nppHandle, nullptr) != uiThread_) { return {}; }
-    int index{-1};
-    if (SendMessageW(data_._nppHandle, NPPM_GETCURRENTSCINTILLA, 0, reinterpret_cast<LPARAM>(&index)) != TRUE
-        || (index != 0 && index != 1)) { return {}; }
-    const auto view{index == 0 ? data_._scintillaMainHandle : data_._scintillaSecondHandle};
+    const auto view{activeView()};
+    if (!view) { return {}; }
     if (!IsWindow(view) || GetWindowThreadProcessId(view, nullptr) != uiThread_) { return {}; }
-    const auto q = [view](UINT message) { return static_cast<sptr_t>(SendMessageW(view, message, 0, 0)); };
+    const auto q = [view](UINT message) { return ScintillaGateway::message(view, message); };
     (void)SendMessageW(view, SCI_SETSTATUS, SC_STATUS_OK, 0);
     SnapshotMetadata m{};
     m.view = view;
@@ -35,10 +53,7 @@ std::optional<SnapshotMetadata> ScintillaGateway::identity() const noexcept {
     m.begin = q(SCI_GETSELECTIONSTART); m.end = q(SCI_GETSELECTIONEND);
     m.anchor = q(SCI_GETANCHOR); m.caret = q(SCI_GETCURRENTPOS);
     m.codepage = q(SCI_GETCODEPAGE); m.eol = q(SCI_GETEOLMODE);
-    if (!m.buffer || !m.document || m.length < 0 || m.begin < 0 || m.end < m.begin || m.end > m.length
-        || m.anchor < 0 || m.caret < 0 || m.anchor > m.length || m.caret > m.length
-        || m.begin != std::min(m.anchor, m.caret) || m.end != std::max(m.anchor, m.caret)
-        || m.eol < SC_EOL_CRLF || m.eol > SC_EOL_LF || q(SCI_GETSTATUS) != SC_STATUS_OK) { return {}; }
+    if (!validMetadata(m) || q(SCI_GETSTATUS) != SC_STATUS_OK) { return {}; }
     return m;
 }
 CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBudget> budget) const noexcept {
@@ -50,16 +65,10 @@ CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBud
     try {
         if (uiThread_ == 0 || GetCurrentThreadId() != uiThread_ || !IsWindow(data_._nppHandle)
             || GetWindowThreadProcessId(data_._nppHandle, nullptr) != uiThread_) { return fail(CaptureErrorCode::Api); }
-        const auto active = [&]() -> HWND {
-            int index{-1};
-            if (SendMessageW(data_._nppHandle, NPPM_GETCURRENTSCINTILLA, 0,
-                reinterpret_cast<LPARAM>(&index)) != TRUE || (index != 0 && index != 1)) { return nullptr; }
-            return index == 0 ? data_._scintillaMainHandle : data_._scintillaSecondHandle;
-        };
-        const HWND view{active()};
+        const HWND view{activeView()};
         if (!IsWindow(view) || GetWindowThreadProcessId(view, nullptr) != uiThread_) { return fail(CaptureErrorCode::Api); }
         const auto query = [&](UINT message, uptr_t w = 0, sptr_t l = 0) -> sptr_t {
-            return static_cast<sptr_t>(SendMessageW(view, message, static_cast<WPARAM>(w), static_cast<LPARAM>(l)));
+            return ScintillaGateway::message(view, message, w, l);
         };
         const auto read = [&]() -> SnapshotMetadata {
             SnapshotMetadata m{};
@@ -77,12 +86,7 @@ CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBud
         };
         (void)query(SCI_SETSTATUS, SC_STATUS_OK);
         const auto before{read()};
-        if (before.buffer == 0 || before.document == 0 || before.length < 0 || before.begin < 0
-            || before.end < before.begin || before.end > before.length || before.anchor < 0
-            || before.caret < 0 || before.anchor > before.length || before.caret > before.length
-            || before.begin != std::min(before.anchor, before.caret)
-            || before.end != std::max(before.anchor, before.caret)
-            || before.eol < SC_EOL_CRLF || before.eol > SC_EOL_LF) { return fail(CaptureErrorCode::Api); }
+        if (!validMetadata(before)) { return fail(CaptureErrorCode::Api); }
         if (query(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::Api); }
         scope = before;
         if (scope->anchor == scope->caret) { scope->begin = 0; scope->end = scope->length; }
@@ -106,7 +110,7 @@ CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBud
         if (count != static_cast<sptr_t>(selected ? size + 1 : size) || snapshot.bytes[size] != '\0') { return fail(CaptureErrorCode::Api); }
         const auto after{read()};
         if (query(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::Api); }
-        if (active() != view || before != after) { return fail(CaptureErrorCode::DocumentChanged); }
+        if (activeView() != view || before != after) { return fail(CaptureErrorCode::DocumentChanged); }
         if (const auto invalid{validateUtf8Bytes(snapshot.text())}; invalid) { return fail(CaptureErrorCode::InvalidUtf8, invalid->offset); }
         const auto nul{snapshot.text().find('\0')};
         if (nul != std::string_view::npos) { return fail(CaptureErrorCode::RawNul, nul); }
@@ -133,7 +137,7 @@ CommitResult ScintillaGateway::commit(const ScintillaSnapshot& snapshot, std::st
         };
         if (!matches()) { return fail(CaptureErrorCode::DocumentChanged); }
         const auto q = [&](UINT message, uptr_t w = 0, sptr_t l = 0) {
-            return static_cast<sptr_t>(SendMessageW(m.view, message, static_cast<WPARAM>(w), static_cast<LPARAM>(l)));
+            return ScintillaGateway::message(m.view, message, w, l);
         };
         const auto supported = [&] {
             return q(SCI_GETREADONLY) == 0 && q(SCI_GETUNDOCOLLECTION) == 1
@@ -181,9 +185,7 @@ CommitResult ScintillaGateway::commit(const ScintillaSnapshot& snapshot, std::st
         (void)q(SCI_SETSEL, static_cast<uptr_t>(m.begin), m.end);
         if (q(SCI_GETSTATUS) != SC_STATUS_OK || q(SCI_GETANCHOR) != m.begin || q(SCI_GETCURRENTPOS) != m.end) {
             const auto observed{identity()};
-            if (observed && observed->view == m.view && observed->buffer == m.buffer
-                && observed->document == m.document && observed->length == m.length
-                && observed->anchor == m.begin && observed->caret == m.end) {
+            if (observed && canRestoreSelection(*observed, m)) {
                 (void)q(SCI_SETSEL, static_cast<uptr_t>(m.anchor), m.caret);
             }
             return fail(CaptureErrorCode::Api);
@@ -198,9 +200,7 @@ CommitResult ScintillaGateway::commit(const ScintillaSnapshot& snapshot, std::st
         if (!stillOriginal || !selectedIdentity || *selectedIdentity != expectedIdentity || !supported() || (current && !current(context))) {
             // Restore only the original document; another buffer now owns its
             // own selection and must not receive a compensating SETSEL.
-            if (selectedIdentity && selectedIdentity->view == m.view && selectedIdentity->buffer == m.buffer
-                && selectedIdentity->document == m.document && selectedIdentity->length == m.length
-                && selectedIdentity->anchor == m.begin && selectedIdentity->caret == m.end) {
+            if (selectedIdentity && canRestoreSelection(*selectedIdentity, m)) {
                 (void)q(SCI_SETSEL, static_cast<uptr_t>(m.anchor), m.caret);
             }
             return fail(CaptureErrorCode::DocumentChanged);

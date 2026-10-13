@@ -69,6 +69,10 @@ public:
         std::shared_ptr<CoreBudget> budget, bool (*current)(void*) noexcept = nullptr, void* context = nullptr,
         int undoToken = 0) const noexcept;
 private:
+    [[nodiscard]] static sptr_t message(HWND view, UINT code, uptr_t w = 0, sptr_t l = 0) noexcept;
+    [[nodiscard]] static bool validMetadata(const SnapshotMetadata& metadata) noexcept;
+    [[nodiscard]] static bool canRestoreSelection(const SnapshotMetadata& observed, const SnapshotMetadata& original) noexcept;
+    [[nodiscard]] HWND activeView() const noexcept;
     NppData data_{};
     DWORD uiThread_{};
 };

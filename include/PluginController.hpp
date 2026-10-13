@@ -65,6 +65,10 @@ private:
     static LRESULT CALLBACK procedure(HWND, UINT, WPARAM, LPARAM) noexcept;
     void work(std::stop_token stop) noexcept;
     void start(OutputMode mode) noexcept;
+    void processDelivery(FormatDelivery& delivery) noexcept;
+    [[nodiscard]] static CaptureError coreError(const FormatDelivery& delivery) noexcept;
+    void processViewNotification(const SCNotification& notification, UINT code, HWND origin) noexcept;
+    [[nodiscard]] bool processLifecycle(const SCNotification& notification, UINT code, bool hostEvent) noexcept;
     void queueDiagnostic() noexcept;
     void presentDiagnostic() noexcept;
     struct QueuedDiagnostic { CaptureError error{}; std::uint64_t generation{}; };

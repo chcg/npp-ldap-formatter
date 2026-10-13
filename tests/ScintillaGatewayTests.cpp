@@ -261,6 +261,9 @@ int main() {
     state.anchor = state.caret = 0;
     const auto malformed = [&] {
         state.copied = false;
+        // Both readers use the same metadata predicate despite their distinct
+        // message order; neither may copy bytes from an invalid identity.
+        check(!gateway.identity());
         rejected(ldap::CaptureErrorCode::Api);
         check(!state.copied && budget->used() == baseline);
     };

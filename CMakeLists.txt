@@ -97,7 +97,8 @@ if(NOT NPP_LDAP_MANIFEST_ONLY)
     target_include_directories(ldap_core PUBLIC include)
     target_compile_features(ldap_core PUBLIC cxx_std_20)
     target_compile_options(ldap_core PRIVATE /W4 /WX /permissive- /utf-8 /EHsc)
-    add_library(ldap_gateway STATIC src/ScintillaGateway.cpp src/PluginController.cpp)
+    add_library(ldap_gateway STATIC src/ScintillaGateway.cpp src/PluginController.cpp
+        src/PluginDiagnostics.cpp src/PluginWorker.cpp)
     target_include_directories(ldap_gateway PUBLIC include)
     target_link_libraries(ldap_gateway PUBLIC npp_ldap_host_sdk ldap_core)
     add_library(NppLdapFormatter MODULE src/PluginDefinition.cpp
