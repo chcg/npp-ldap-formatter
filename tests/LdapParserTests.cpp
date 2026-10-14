@@ -8,6 +8,7 @@
 #include <vector>
 #include <atomic>
 #include <thread>
+#include <barrier>
 #include <new>
 
 namespace {
@@ -427,12 +428,14 @@ void quotasAndCancellation() {
     {
         auto occupied{budget->reserve(budget->remaining())};
         require(occupied.has_value() && !budget->reserve(1), "Budget inclusive maximum failed");
+        require(budget->peak() == ldap::MaxCoreBytes, "Peak missed inclusive limit or changed on rejection");
         const auto result{ldap::formatFilter("(cn=x)", options)};
         require(!result.ok() && result.text.empty() && result.error->code == LdapErrorCode::MemoryExceeded,
             "Exhausted budget did not return typed memory error");
         require(budget->used() == ldap::MaxCoreBytes, "Failure leaked/released external reservation");
     }
-    require(budget->used() == baseline, "External reservation leaked");
+    require(budget->used() == baseline && budget->peak() == ldap::MaxCoreBytes,
+        "External reservation leaked or release reduced peak");
     {
         auto occupied{budget->reserve(ldap::MaxCoreBytes - maximum.size() - 8192)};
         const auto result{ldap::formatFilter(maximum, options)};
@@ -441,19 +444,43 @@ void quotasAndCancellation() {
         require(budget->used() == baseline + occupied->bytes(), "Failed allocation leaked reservations");
     }
     {
+        auto concurrentBudget{std::make_shared<ldap::CoreBudget>()};
+        const auto concurrentBaseline{concurrentBudget->used()};
+        require(concurrentBudget->peak() == concurrentBaseline, "Initial peak differs from baseline");
+        require(!concurrentBudget->reserve(ldap::MaxCoreBytes)
+            && concurrentBudget->peak() == concurrentBaseline, "Rejected acquisition changed initial peak");
+        std::barrier rendezvous{3};
         std::atomic<bool> failed{};
-        const auto exercise = [&budget, &failed] {
+        const auto exercise = [&concurrentBudget, &failed, &rendezvous] {
+            { auto held{concurrentBudget->reserve(1024)};
+              if (!held) { failed.store(true); }
+              rendezvous.arrive_and_wait(); }
             for (std::size_t i{}; i < 1000; ++i) {
-                auto reservation{budget->reserve(ldap::MaxCoreBytes / 2)};
-                if (budget->used() > ldap::MaxCoreBytes) { failed.store(true); }
+                auto reservation{concurrentBudget->reserve(1024)};
+                if (concurrentBudget->used() > ldap::MaxCoreBytes) { failed.store(true); }
+                if (reservation) {
+                    auto moved{std::move(*reservation)};
+                    if (moved.bytes() != 1024) { failed.store(true); }
+                }
+            }
+        };
+        { std::jthread first{exercise}; std::jthread second{exercise}; std::jthread third{exercise}; }
+        require(!failed.load() && concurrentBudget->used() == concurrentBaseline
+            && concurrentBudget->peak() == concurrentBaseline + 3072, "Concurrent reservations broke accounting/peak");
+        const auto stressLimit = [&concurrentBudget, &failed] {
+            for (std::size_t i{}; i < 1000; ++i) {
+                auto reservation{concurrentBudget->reserve(ldap::MaxCoreBytes / 2)};
+                if (concurrentBudget->used() > ldap::MaxCoreBytes) { failed.store(true); }
                 if (reservation) {
                     auto moved{std::move(*reservation)};
                     if (moved.bytes() != ldap::MaxCoreBytes / 2) { failed.store(true); }
                 }
             }
         };
-        { std::jthread first{exercise}; std::jthread second{exercise}; std::jthread third{exercise}; }
-        require(!failed.load() && budget->used() == baseline, "Concurrent reservations broke accounting");
+        { std::jthread first{stressLimit}; std::jthread second{stressLimit}; std::jthread third{stressLimit}; }
+        require(!failed.load() && concurrentBudget->used() == concurrentBaseline
+            && concurrentBudget->peak() == concurrentBaseline + ldap::MaxCoreBytes / 2,
+            "Concurrent limit/rejections broke accounting/peak");
     }
 
     const std::string attribute{"(" + std::string(8192, 'a') + "=x)"};

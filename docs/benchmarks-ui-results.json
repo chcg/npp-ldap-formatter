@@ -1,0 +1,2395 @@
+{
+  "schema": 2,
+  "complete": true,
+  "environment": {
+    "os": "Windows 10",
+    "windows_major": 10,
+    "windows_minor": 0,
+    "windows_build": 19044,
+    "cpu_model": "Intel(R) Core(TM) i7-6700T CPU @ 2.80GHz",
+    "physical_cores": 4,
+    "logical_processors": 8,
+    "ram_bytes": 17067855872,
+    "storage_reference": "not-verified",
+    "architecture": "x64"
+  },
+  "provenance": {
+    "host": {
+      "size": 8546288,
+      "sha256": "c52c9ed2ec6d0b5b3f243b29f2124f98db56b6ba92bb42a9af2665709464b3cf",
+      "machine": "x64",
+      "pe_valid": true
+    },
+    "benchmark_dll": {
+      "size": 331264,
+      "sha256": "9fea5ff191c7506d61e50eddc3b12861867b7bc20daba27fe28642f9049e1e81",
+      "machine": "x64",
+      "pe_valid": true
+    },
+    "archive_sha256": "beddf5548e75c97930d1575ba1c7d113e6e2b33d0a200310e734ca08e225f414",
+    "host_version": "8.9.8.1",
+    "scintilla_version_source": "pinned-sdk-and-official-host-archive",
+    "build": {
+      "architecture": "x64",
+      "compiler": "19.44.35229.0",
+      "compiler_full_version": 194435229,
+      "configuration": "Release",
+      "dll_sha256": "9fea5ff191c7506d61e50eddc3b12861867b7bc20daba27fe28642f9049e1e81",
+      "runtime": "MultiThreaded",
+      "scintilla_version": "5.6.6",
+      "sdk_revision": "dd40fe45598791e9aa38f3aeb200e10fb3d6338a",
+      "source_digest": "dc97ed3b6acf0c456d9b5916662fc1dcda800eab91f2b416cc10f106c0a0554a",
+      "source_modified": true,
+      "source_revision": "2fd497676d3630c3df575e093c01d6b7b48eb73a",
+      "toolset": "14.44.35207",
+      "windows_sdk": "10.0.26100.0"
+    },
+    "source_revision": "2fd497676d3630c3df575e093c01d6b7b48eb73a",
+    "source_modified": true
+  },
+  "protocol": {
+    "warmups": 5,
+    "samples": 30,
+    "p95": "nearest-rank",
+    "fresh_process_per_scenario": true,
+    "ui_timer_period_ms": 10,
+    "working_set_peak": "process-lifetime-os-high-water",
+    "core_peak": "shared-budget-exact-acquisition-high-water"
+  },
+  "scenarios": [
+    {
+      "native": {
+        "schema": 1,
+        "complete": true,
+        "input_bytes": 262144,
+        "mode": "Pretty",
+        "host_version_code": 525269,
+        "compiler_version": 194435229,
+        "ui_thread": 760,
+        "worker_scintilla_calls": 0,
+        "timer_period_ms": 10,
+        "setup_settle_ms": 100,
+        "failure_stage": 0,
+        "failure_code": 0,
+        "working_set_base_bytes": 30564352,
+        "working_set_final_bytes": 47968256,
+        "working_set_peak_bytes": 52764672,
+        "executions": 35,
+        "runs": [
+          {
+            "capture_ms": 1.2491,
+            "format_ms": 5.4087,
+            "commit_ms": 11.9294,
+            "total_ms": 19.2997,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 5.7235
+          },
+          {
+            "capture_ms": 1.1195,
+            "format_ms": 4.7892,
+            "commit_ms": 12.3253,
+            "total_ms": 18.8233,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 5.0916
+          },
+          {
+            "capture_ms": 1.107,
+            "format_ms": 5.3024,
+            "commit_ms": 11.8621,
+            "total_ms": 18.9027,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 5.6112
+          },
+          {
+            "capture_ms": 1.1476,
+            "format_ms": 4.3142,
+            "commit_ms": 10.747,
+            "total_ms": 16.7768,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 4.577
+          },
+          {
+            "capture_ms": 0.6765,
+            "format_ms": 2.4149,
+            "commit_ms": 9.3251,
+            "total_ms": 12.8486,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.6109
+          },
+          {
+            "capture_ms": 1.1879,
+            "format_ms": 2.3537,
+            "commit_ms": 10.4185,
+            "total_ms": 16.3864,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 0,
+            "ui_max_gap_ms": 4.7795
+          },
+          {
+            "capture_ms": 1.4325,
+            "format_ms": 4.9789,
+            "commit_ms": 11.7437,
+            "total_ms": 18.9636,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 5.3489
+          },
+          {
+            "capture_ms": 1.473,
+            "format_ms": 4.1522,
+            "commit_ms": 13.0505,
+            "total_ms": 19.2968,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 4.4821
+          },
+          {
+            "capture_ms": 1.4445,
+            "format_ms": 5.3149,
+            "commit_ms": 9.7865,
+            "total_ms": 17.2202,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 5.6415
+          },
+          {
+            "capture_ms": 1.1744,
+            "format_ms": 4.126,
+            "commit_ms": 9.6402,
+            "total_ms": 15.5552,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 4.4471
+          },
+          {
+            "capture_ms": 0.9028,
+            "format_ms": 2.3618,
+            "commit_ms": 9.5474,
+            "total_ms": 13.3655,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.6405
+          },
+          {
+            "capture_ms": 1.0367,
+            "format_ms": 2.5663,
+            "commit_ms": 10.6142,
+            "total_ms": 14.632,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.7446
+          },
+          {
+            "capture_ms": 1.2538,
+            "format_ms": 4.8375,
+            "commit_ms": 11.704,
+            "total_ms": 18.4494,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 5.2011
+          },
+          {
+            "capture_ms": 0.8034,
+            "format_ms": 2.3474,
+            "commit_ms": 8.1639,
+            "total_ms": 11.729,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5279
+          },
+          {
+            "capture_ms": 1.3916,
+            "format_ms": 2.356,
+            "commit_ms": 11.0497,
+            "total_ms": 15.2479,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5221
+          },
+          {
+            "capture_ms": 0.8134,
+            "format_ms": 2.3563,
+            "commit_ms": 9.8176,
+            "total_ms": 13.4382,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5314
+          },
+          {
+            "capture_ms": 1.0463,
+            "format_ms": 2.3756,
+            "commit_ms": 8.8302,
+            "total_ms": 12.674,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.575
+          },
+          {
+            "capture_ms": 0.8102,
+            "format_ms": 2.3564,
+            "commit_ms": 9.1226,
+            "total_ms": 12.7097,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5377
+          },
+          {
+            "capture_ms": 0.7996,
+            "format_ms": 2.355,
+            "commit_ms": 9.0484,
+            "total_ms": 12.6768,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5666
+          },
+          {
+            "capture_ms": 0.8024,
+            "format_ms": 2.3428,
+            "commit_ms": 9.4497,
+            "total_ms": 12.9955,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5214
+          },
+          {
+            "capture_ms": 0.8912,
+            "format_ms": 2.351,
+            "commit_ms": 9.4766,
+            "total_ms": 13.1275,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5328
+          },
+          {
+            "capture_ms": 0.8091,
+            "format_ms": 2.3693,
+            "commit_ms": 8.4006,
+            "total_ms": 12.0114,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5728
+          },
+          {
+            "capture_ms": 0.82,
+            "format_ms": 5.1594,
+            "commit_ms": 9.5879,
+            "total_ms": 16.3049,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 5.5953
+          },
+          {
+            "capture_ms": 1.0212,
+            "format_ms": 2.3535,
+            "commit_ms": 9.5024,
+            "total_ms": 13.4162,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.6252
+          },
+          {
+            "capture_ms": 0.6664,
+            "format_ms": 2.3861,
+            "commit_ms": 8.1767,
+            "total_ms": 11.6513,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5745
+          },
+          {
+            "capture_ms": 0.6659,
+            "format_ms": 2.4734,
+            "commit_ms": 10.4389,
+            "total_ms": 14.0182,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.6873
+          },
+          {
+            "capture_ms": 1.2381,
+            "format_ms": 2.3693,
+            "commit_ms": 7.9864,
+            "total_ms": 12.0766,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5851
+          },
+          {
+            "capture_ms": 0.7074,
+            "format_ms": 2.3931,
+            "commit_ms": 8.8478,
+            "total_ms": 12.35,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.577
+          },
+          {
+            "capture_ms": 0.6599,
+            "format_ms": 2.4246,
+            "commit_ms": 8.9523,
+            "total_ms": 12.4728,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.6204
+          },
+          {
+            "capture_ms": 0.6764,
+            "format_ms": 2.3529,
+            "commit_ms": 10.4302,
+            "total_ms": 13.87,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5455
+          },
+          {
+            "capture_ms": 0.6962,
+            "format_ms": 2.5883,
+            "commit_ms": 8.5815,
+            "total_ms": 12.3214,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.8179
+          },
+          {
+            "capture_ms": 0.7768,
+            "format_ms": 2.3762,
+            "commit_ms": 10.0102,
+            "total_ms": 13.5918,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5728
+          },
+          {
+            "capture_ms": 0.6764,
+            "format_ms": 2.4298,
+            "commit_ms": 9.5965,
+            "total_ms": 13.1972,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.6222
+          },
+          {
+            "capture_ms": 0.6651,
+            "format_ms": 2.3606,
+            "commit_ms": 8.3062,
+            "total_ms": 11.7605,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5339
+          },
+          {
+            "capture_ms": 0.669,
+            "format_ms": 2.3611,
+            "commit_ms": 9.5792,
+            "total_ms": 13.0298,
+            "output_bytes": 165269,
+            "core_peak_bytes": 1020598,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.5557
+          }
+        ]
+      },
+      "warmups": 5,
+      "samples": 30,
+      "output_bytes": 165269,
+      "p95_ms": {
+        "capture_ms": 1.4445,
+        "format_ms": 5.1594,
+        "commit_ms": 11.7437,
+        "total_ms": 18.9636
+      },
+      "core_peak_bytes": 1020598,
+      "working_set_peak_delta_bytes": 22200320,
+      "ui_ticks": 29,
+      "ui_max_gap_ms": 5.6415,
+      "capture_gate": "passed",
+      "commit_gate": "passed"
+    },
+    {
+      "native": {
+        "schema": 1,
+        "complete": true,
+        "input_bytes": 262144,
+        "mode": "Compact",
+        "host_version_code": 525269,
+        "compiler_version": 194435229,
+        "ui_thread": 16256,
+        "worker_scintilla_calls": 0,
+        "timer_period_ms": 10,
+        "setup_settle_ms": 100,
+        "failure_stage": 0,
+        "failure_code": 0,
+        "working_set_base_bytes": 30638080,
+        "working_set_final_bytes": 48476160,
+        "working_set_peak_bytes": 51404800,
+        "executions": 35,
+        "runs": [
+          {
+            "capture_ms": 1.2587,
+            "format_ms": 2.2015,
+            "commit_ms": 20.2721,
+            "total_ms": 24.3801,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3875
+          },
+          {
+            "capture_ms": 0.6578,
+            "format_ms": 2.145,
+            "commit_ms": 18.4253,
+            "total_ms": 21.6511,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3407
+          },
+          {
+            "capture_ms": 0.6728,
+            "format_ms": 2.1691,
+            "commit_ms": 23.2601,
+            "total_ms": 26.5938,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.4444
+          },
+          {
+            "capture_ms": 0.6705,
+            "format_ms": 2.1077,
+            "commit_ms": 18.4502,
+            "total_ms": 21.6251,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.275
+          },
+          {
+            "capture_ms": 0.669,
+            "format_ms": 2.0952,
+            "commit_ms": 15.9863,
+            "total_ms": 19.2964,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3532
+          },
+          {
+            "capture_ms": 0.6637,
+            "format_ms": 2.0954,
+            "commit_ms": 17.3201,
+            "total_ms": 20.5405,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3308
+          },
+          {
+            "capture_ms": 0.875,
+            "format_ms": 2.2137,
+            "commit_ms": 17.1544,
+            "total_ms": 20.7111,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.4069
+          },
+          {
+            "capture_ms": 1.1908,
+            "format_ms": 4.5835,
+            "commit_ms": 18.6682,
+            "total_ms": 25.0107,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 4.8568
+          },
+          {
+            "capture_ms": 0.7997,
+            "format_ms": 2.1432,
+            "commit_ms": 16.0757,
+            "total_ms": 19.4146,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3167
+          },
+          {
+            "capture_ms": 0.799,
+            "format_ms": 2.1624,
+            "commit_ms": 16.6152,
+            "total_ms": 19.9909,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.347
+          },
+          {
+            "capture_ms": 0.8397,
+            "format_ms": 2.1507,
+            "commit_ms": 16.4075,
+            "total_ms": 19.9519,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.4179
+          },
+          {
+            "capture_ms": 0.852,
+            "format_ms": 2.15,
+            "commit_ms": 16.1001,
+            "total_ms": 19.4992,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3252
+          },
+          {
+            "capture_ms": 0.7964,
+            "format_ms": 2.1586,
+            "commit_ms": 16.197,
+            "total_ms": 19.6836,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.4413
+          },
+          {
+            "capture_ms": 1.3818,
+            "format_ms": 2.2149,
+            "commit_ms": 16.7652,
+            "total_ms": 20.8998,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.4487
+          },
+          {
+            "capture_ms": 0.7973,
+            "format_ms": 2.1615,
+            "commit_ms": 19.0755,
+            "total_ms": 22.4547,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3535
+          },
+          {
+            "capture_ms": 0.7995,
+            "format_ms": 2.2004,
+            "commit_ms": 18.8077,
+            "total_ms": 22.2307,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3862
+          },
+          {
+            "capture_ms": 0.8226,
+            "format_ms": 2.1923,
+            "commit_ms": 21.2805,
+            "total_ms": 24.716,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3808
+          },
+          {
+            "capture_ms": 0.8046,
+            "format_ms": 2.151,
+            "commit_ms": 19.9302,
+            "total_ms": 23.439,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.402
+          },
+          {
+            "capture_ms": 0.7965,
+            "format_ms": 2.1626,
+            "commit_ms": 28.4955,
+            "total_ms": 31.8677,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3489
+          },
+          {
+            "capture_ms": 0.8003,
+            "format_ms": 2.1583,
+            "commit_ms": 16.3874,
+            "total_ms": 19.8067,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3396
+          },
+          {
+            "capture_ms": 0.798,
+            "format_ms": 2.1624,
+            "commit_ms": 17.0549,
+            "total_ms": 20.4133,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3493
+          },
+          {
+            "capture_ms": 0.8102,
+            "format_ms": 2.1446,
+            "commit_ms": 16.5145,
+            "total_ms": 19.9449,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3693
+          },
+          {
+            "capture_ms": 0.7944,
+            "format_ms": 2.1419,
+            "commit_ms": 16.0377,
+            "total_ms": 19.3897,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3048
+          },
+          {
+            "capture_ms": 1.3823,
+            "format_ms": 2.1462,
+            "commit_ms": 31.6335,
+            "total_ms": 35.6343,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3315
+          },
+          {
+            "capture_ms": 0.7983,
+            "format_ms": 2.141,
+            "commit_ms": 21.1821,
+            "total_ms": 24.5368,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3215
+          },
+          {
+            "capture_ms": 0.8837,
+            "format_ms": 2.142,
+            "commit_ms": 23.0756,
+            "total_ms": 26.5292,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3302
+          },
+          {
+            "capture_ms": 0.808,
+            "format_ms": 2.1675,
+            "commit_ms": 16.3478,
+            "total_ms": 19.7298,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3544
+          },
+          {
+            "capture_ms": 0.7974,
+            "format_ms": 2.1406,
+            "commit_ms": 18.8956,
+            "total_ms": 22.2294,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3165
+          },
+          {
+            "capture_ms": 1.2613,
+            "format_ms": 3.4848,
+            "commit_ms": 22.3757,
+            "total_ms": 27.6442,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 3.7441
+          },
+          {
+            "capture_ms": 0.8599,
+            "format_ms": 3.6893,
+            "commit_ms": 24.0536,
+            "total_ms": 29.2155,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 4.0511
+          },
+          {
+            "capture_ms": 0.815,
+            "format_ms": 2.1611,
+            "commit_ms": 15.7957,
+            "total_ms": 19.2588,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.4023
+          },
+          {
+            "capture_ms": 0.8024,
+            "format_ms": 2.1378,
+            "commit_ms": 19.5648,
+            "total_ms": 23.0619,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.4128
+          },
+          {
+            "capture_ms": 0.7993,
+            "format_ms": 2.1453,
+            "commit_ms": 21.239,
+            "total_ms": 24.6987,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3845
+          },
+          {
+            "capture_ms": 1.3759,
+            "format_ms": 2.1469,
+            "commit_ms": 16.6405,
+            "total_ms": 20.7237,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3708
+          },
+          {
+            "capture_ms": 1.0773,
+            "format_ms": 2.2187,
+            "commit_ms": 16.0125,
+            "total_ms": 19.8467,
+            "output_bytes": 89143,
+            "core_peak_bytes": 792218,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 2.3915
+          }
+        ]
+      },
+      "warmups": 5,
+      "samples": 30,
+      "output_bytes": 89143,
+      "p95_ms": {
+        "capture_ms": 1.3818,
+        "format_ms": 3.6893,
+        "commit_ms": 28.4955,
+        "total_ms": 31.8677
+      },
+      "core_peak_bytes": 792218,
+      "working_set_peak_delta_bytes": 20766720,
+      "ui_ticks": 30,
+      "ui_max_gap_ms": 4.8568,
+      "capture_gate": "passed",
+      "commit_gate": "passed"
+    },
+    {
+      "native": {
+        "schema": 1,
+        "complete": true,
+        "input_bytes": 1048576,
+        "mode": "Pretty",
+        "host_version_code": 525269,
+        "compiler_version": 194435229,
+        "ui_thread": 29016,
+        "worker_scintilla_calls": 0,
+        "timer_period_ms": 10,
+        "setup_settle_ms": 100,
+        "failure_stage": 0,
+        "failure_code": 0,
+        "working_set_base_bytes": 30609408,
+        "working_set_final_bytes": 50266112,
+        "working_set_peak_bytes": 68636672,
+        "executions": 35,
+        "runs": [
+          {
+            "capture_ms": 2.0168,
+            "format_ms": 10.031,
+            "commit_ms": 18.2382,
+            "total_ms": 30.7683,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 10.2268
+          },
+          {
+            "capture_ms": 1.9404,
+            "format_ms": 9.3077,
+            "commit_ms": 14.2303,
+            "total_ms": 25.944,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.5367
+          },
+          {
+            "capture_ms": 1.9686,
+            "format_ms": 9.4403,
+            "commit_ms": 14.0265,
+            "total_ms": 25.9177,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6719
+          },
+          {
+            "capture_ms": 1.9385,
+            "format_ms": 9.4166,
+            "commit_ms": 16.4447,
+            "total_ms": 28.2257,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6098
+          },
+          {
+            "capture_ms": 2.9849,
+            "format_ms": 9.4661,
+            "commit_ms": 13.8582,
+            "total_ms": 26.843,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.7048
+          },
+          {
+            "capture_ms": 1.9226,
+            "format_ms": 9.3965,
+            "commit_ms": 14.8162,
+            "total_ms": 26.6046,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6048
+          },
+          {
+            "capture_ms": 1.9886,
+            "format_ms": 20.4357,
+            "commit_ms": 16.5183,
+            "total_ms": 39.597,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 13.4091
+          },
+          {
+            "capture_ms": 3.6709,
+            "format_ms": 9.4395,
+            "commit_ms": 13.7044,
+            "total_ms": 27.2822,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6282
+          },
+          {
+            "capture_ms": 1.9246,
+            "format_ms": 9.3797,
+            "commit_ms": 16.7089,
+            "total_ms": 28.4261,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.5502
+          },
+          {
+            "capture_ms": 2.0119,
+            "format_ms": 9.8733,
+            "commit_ms": 15.4279,
+            "total_ms": 27.7659,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 10.0831
+          },
+          {
+            "capture_ms": 1.9281,
+            "format_ms": 9.8946,
+            "commit_ms": 12.9559,
+            "total_ms": 25.2816,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 10.1218
+          },
+          {
+            "capture_ms": 1.9293,
+            "format_ms": 9.8183,
+            "commit_ms": 15.3228,
+            "total_ms": 27.5228,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 10.0384
+          },
+          {
+            "capture_ms": 3.5375,
+            "format_ms": 9.4075,
+            "commit_ms": 16.4914,
+            "total_ms": 29.9131,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.5812
+          },
+          {
+            "capture_ms": 1.9373,
+            "format_ms": 9.7569,
+            "commit_ms": 13.232,
+            "total_ms": 25.393,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.9474
+          },
+          {
+            "capture_ms": 1.962,
+            "format_ms": 9.4719,
+            "commit_ms": 14.8886,
+            "total_ms": 26.7591,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6462
+          },
+          {
+            "capture_ms": 1.8929,
+            "format_ms": 9.4317,
+            "commit_ms": 13.298,
+            "total_ms": 25.059,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6426
+          },
+          {
+            "capture_ms": 4.2345,
+            "format_ms": 15.1902,
+            "commit_ms": 13.2767,
+            "total_ms": 33.2574,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 9.2345
+          },
+          {
+            "capture_ms": 3.6004,
+            "format_ms": 11.7712,
+            "commit_ms": 14.0339,
+            "total_ms": 29.995,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 12.0671
+          },
+          {
+            "capture_ms": 1.9269,
+            "format_ms": 9.4369,
+            "commit_ms": 13.2902,
+            "total_ms": 25.1189,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6735
+          },
+          {
+            "capture_ms": 1.9656,
+            "format_ms": 9.5717,
+            "commit_ms": 13.7885,
+            "total_ms": 25.7691,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.7773
+          },
+          {
+            "capture_ms": 3.7347,
+            "format_ms": 9.3556,
+            "commit_ms": 14.6344,
+            "total_ms": 28.2454,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.5547
+          },
+          {
+            "capture_ms": 3.6334,
+            "format_ms": 9.3886,
+            "commit_ms": 15.3053,
+            "total_ms": 28.8025,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.5752
+          },
+          {
+            "capture_ms": 1.9579,
+            "format_ms": 10.3114,
+            "commit_ms": 14.1835,
+            "total_ms": 26.983,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 10.5665
+          },
+          {
+            "capture_ms": 3.1052,
+            "format_ms": 16.8862,
+            "commit_ms": 15.0475,
+            "total_ms": 35.5263,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 12.262
+          },
+          {
+            "capture_ms": 2.3069,
+            "format_ms": 20.6574,
+            "commit_ms": 14.717,
+            "total_ms": 38.3194,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 13.1448
+          },
+          {
+            "capture_ms": 2.9073,
+            "format_ms": 9.3832,
+            "commit_ms": 14.7634,
+            "total_ms": 27.4942,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.5804
+          },
+          {
+            "capture_ms": 1.9822,
+            "format_ms": 9.4462,
+            "commit_ms": 13.4555,
+            "total_ms": 25.3017,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6342
+          },
+          {
+            "capture_ms": 2.0926,
+            "format_ms": 9.5718,
+            "commit_ms": 15.6937,
+            "total_ms": 27.8031,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.7972
+          },
+          {
+            "capture_ms": 2.8173,
+            "format_ms": 20.5563,
+            "commit_ms": 16.1601,
+            "total_ms": 40.0945,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 12.2932
+          },
+          {
+            "capture_ms": 3.119,
+            "format_ms": 19.2053,
+            "commit_ms": 14.0963,
+            "total_ms": 36.9865,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 12.434
+          },
+          {
+            "capture_ms": 1.9233,
+            "format_ms": 9.9185,
+            "commit_ms": 12.9457,
+            "total_ms": 25.216,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 10.1007
+          },
+          {
+            "capture_ms": 1.9972,
+            "format_ms": 9.4862,
+            "commit_ms": 14.879,
+            "total_ms": 26.7832,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.685
+          },
+          {
+            "capture_ms": 1.8922,
+            "format_ms": 16.1542,
+            "commit_ms": 16.8323,
+            "total_ms": 35.3284,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 13.6068
+          },
+          {
+            "capture_ms": 3.0602,
+            "format_ms": 10.3123,
+            "commit_ms": 14.072,
+            "total_ms": 27.8756,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 10.5205
+          },
+          {
+            "capture_ms": 1.9358,
+            "format_ms": 9.367,
+            "commit_ms": 15.2367,
+            "total_ms": 27.1272,
+            "output_bytes": 661061,
+            "core_peak_bytes": 4080838,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 9.6751
+          }
+        ]
+      },
+      "warmups": 5,
+      "samples": 30,
+      "output_bytes": 661061,
+      "p95_ms": {
+        "capture_ms": 3.7347,
+        "format_ms": 20.5563,
+        "commit_ms": 16.7089,
+        "total_ms": 39.597
+      },
+      "core_peak_bytes": 4080838,
+      "working_set_peak_delta_bytes": 38027264,
+      "ui_ticks": 37,
+      "ui_max_gap_ms": 13.6068,
+      "capture_gate": "passed",
+      "commit_gate": "passed"
+    },
+    {
+      "native": {
+        "schema": 1,
+        "complete": true,
+        "input_bytes": 1048576,
+        "mode": "Compact",
+        "host_version_code": 525269,
+        "compiler_version": 194435229,
+        "ui_thread": 28080,
+        "worker_scintilla_calls": 0,
+        "timer_period_ms": 10,
+        "setup_settle_ms": 100,
+        "failure_stage": 0,
+        "failure_code": 0,
+        "working_set_base_bytes": 30674944,
+        "working_set_final_bytes": 57450496,
+        "working_set_peak_bytes": 64557056,
+        "executions": 35,
+        "runs": [
+          {
+            "capture_ms": 3.5611,
+            "format_ms": 16.6207,
+            "commit_ms": 99.8505,
+            "total_ms": 122.8873,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 15.2381
+          },
+          {
+            "capture_ms": 3.6167,
+            "format_ms": 8.3302,
+            "commit_ms": 69.1552,
+            "total_ms": 81.5342,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5146
+          },
+          {
+            "capture_ms": 1.9167,
+            "format_ms": 8.3627,
+            "commit_ms": 52.194,
+            "total_ms": 62.8948,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5484
+          },
+          {
+            "capture_ms": 1.9198,
+            "format_ms": 8.5063,
+            "commit_ms": 68.8296,
+            "total_ms": 79.6814,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.7053
+          },
+          {
+            "capture_ms": 1.9572,
+            "format_ms": 8.3284,
+            "commit_ms": 51.4676,
+            "total_ms": 62.1672,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.4933
+          },
+          {
+            "capture_ms": 2.4124,
+            "format_ms": 8.3427,
+            "commit_ms": 51.0558,
+            "total_ms": 62.2529,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5386
+          },
+          {
+            "capture_ms": 2.0236,
+            "format_ms": 8.357,
+            "commit_ms": 53.7736,
+            "total_ms": 64.5773,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5628
+          },
+          {
+            "capture_ms": 1.9395,
+            "format_ms": 8.4561,
+            "commit_ms": 60.8998,
+            "total_ms": 71.7295,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.661
+          },
+          {
+            "capture_ms": 1.9912,
+            "format_ms": 8.3664,
+            "commit_ms": 50.9755,
+            "total_ms": 61.9209,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 6.8512
+          },
+          {
+            "capture_ms": 3.6145,
+            "format_ms": 8.3402,
+            "commit_ms": 64.3385,
+            "total_ms": 76.7878,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5169
+          },
+          {
+            "capture_ms": 1.9399,
+            "format_ms": 8.3587,
+            "commit_ms": 68.2566,
+            "total_ms": 79.0979,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 6.7618
+          },
+          {
+            "capture_ms": 1.9174,
+            "format_ms": 8.368,
+            "commit_ms": 51.9624,
+            "total_ms": 62.6501,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5454
+          },
+          {
+            "capture_ms": 1.9239,
+            "format_ms": 8.3999,
+            "commit_ms": 71.9932,
+            "total_ms": 82.9606,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 6.919
+          },
+          {
+            "capture_ms": 2.4655,
+            "format_ms": 8.3684,
+            "commit_ms": 56.104,
+            "total_ms": 67.3703,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5624
+          },
+          {
+            "capture_ms": 1.9187,
+            "format_ms": 8.3354,
+            "commit_ms": 69.2446,
+            "total_ms": 85.7471,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 0,
+            "ui_max_gap_ms": 14.5835
+          },
+          {
+            "capture_ms": 1.931,
+            "format_ms": 8.3618,
+            "commit_ms": 67.9919,
+            "total_ms": 78.7473,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5429
+          },
+          {
+            "capture_ms": 2.002,
+            "format_ms": 17.8734,
+            "commit_ms": 51.6272,
+            "total_ms": 72.1093,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 13.4325
+          },
+          {
+            "capture_ms": 1.9156,
+            "format_ms": 8.3335,
+            "commit_ms": 51.2159,
+            "total_ms": 61.9129,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.538
+          },
+          {
+            "capture_ms": 2.2818,
+            "format_ms": 8.3507,
+            "commit_ms": 61.4278,
+            "total_ms": 72.5032,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5431
+          },
+          {
+            "capture_ms": 1.9257,
+            "format_ms": 8.3702,
+            "commit_ms": 51.0446,
+            "total_ms": 61.7414,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5216
+          },
+          {
+            "capture_ms": 1.9259,
+            "format_ms": 8.4914,
+            "commit_ms": 69.2485,
+            "total_ms": 80.2129,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 6.8161
+          },
+          {
+            "capture_ms": 3.6407,
+            "format_ms": 8.5454,
+            "commit_ms": 53.3092,
+            "total_ms": 65.9865,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.7479
+          },
+          {
+            "capture_ms": 3.5917,
+            "format_ms": 8.4745,
+            "commit_ms": 56.8094,
+            "total_ms": 69.3366,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.6718
+          },
+          {
+            "capture_ms": 1.9388,
+            "format_ms": 8.36,
+            "commit_ms": 52.1815,
+            "total_ms": 62.8924,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5521
+          },
+          {
+            "capture_ms": 1.9203,
+            "format_ms": 8.3649,
+            "commit_ms": 50.8154,
+            "total_ms": 61.5237,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5604
+          },
+          {
+            "capture_ms": 1.9201,
+            "format_ms": 8.521,
+            "commit_ms": 61.9566,
+            "total_ms": 72.8695,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.692
+          },
+          {
+            "capture_ms": 3.6317,
+            "format_ms": 10.9272,
+            "commit_ms": 50.7863,
+            "total_ms": 65.9239,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 10.8068
+          },
+          {
+            "capture_ms": 3.7232,
+            "format_ms": 12.6171,
+            "commit_ms": 53.3161,
+            "total_ms": 70.2585,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 11.7619
+          },
+          {
+            "capture_ms": 3.4955,
+            "format_ms": 8.3797,
+            "commit_ms": 51.4701,
+            "total_ms": 63.8309,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5578
+          },
+          {
+            "capture_ms": 3.3082,
+            "format_ms": 15.0237,
+            "commit_ms": 93.9799,
+            "total_ms": 112.9431,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 12.1158
+          },
+          {
+            "capture_ms": 1.9395,
+            "format_ms": 11.0321,
+            "commit_ms": 52.7967,
+            "total_ms": 66.2596,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 11.2842
+          },
+          {
+            "capture_ms": 1.9972,
+            "format_ms": 8.3329,
+            "commit_ms": 80.5948,
+            "total_ms": 91.4617,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5814
+          },
+          {
+            "capture_ms": 1.9413,
+            "format_ms": 8.4434,
+            "commit_ms": 75.4433,
+            "total_ms": 86.2826,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.6609
+          },
+          {
+            "capture_ms": 3.4351,
+            "format_ms": 8.329,
+            "commit_ms": 59.1665,
+            "total_ms": 71.4166,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 8.5202
+          },
+          {
+            "capture_ms": 1.9227,
+            "format_ms": 14.5813,
+            "commit_ms": 57.2983,
+            "total_ms": 74.3772,
+            "output_bytes": 356575,
+            "core_peak_bytes": 3167370,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 13.7648
+          }
+        ]
+      },
+      "warmups": 5,
+      "samples": 30,
+      "output_bytes": 356575,
+      "p95_ms": {
+        "capture_ms": 3.6407,
+        "format_ms": 15.0237,
+        "commit_ms": 80.5948,
+        "total_ms": 91.4617
+      },
+      "core_peak_bytes": 3167370,
+      "working_set_peak_delta_bytes": 33882112,
+      "ui_ticks": 34,
+      "ui_max_gap_ms": 14.5835,
+      "capture_gate": "passed",
+      "commit_gate": "failed"
+    },
+    {
+      "native": {
+        "schema": 1,
+        "complete": true,
+        "input_bytes": 5242880,
+        "mode": "Pretty",
+        "host_version_code": 525269,
+        "compiler_version": 194435229,
+        "ui_thread": 13152,
+        "worker_scintilla_calls": 0,
+        "timer_period_ms": 10,
+        "setup_settle_ms": 100,
+        "failure_stage": 0,
+        "failure_code": 0,
+        "working_set_base_bytes": 30552064,
+        "working_set_final_bytes": 63758336,
+        "working_set_peak_bytes": 148242432,
+        "executions": 35,
+        "runs": [
+          {
+            "capture_ms": 9.1165,
+            "format_ms": 94.8007,
+            "commit_ms": 39.8139,
+            "total_ms": 144.643,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 55.7496
+          },
+          {
+            "capture_ms": 9.0183,
+            "format_ms": 53.4201,
+            "commit_ms": 35.3373,
+            "total_ms": 98.3421,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 22.6121
+          },
+          {
+            "capture_ms": 8.9496,
+            "format_ms": 49.2322,
+            "commit_ms": 39.4275,
+            "total_ms": 98.0996,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 23.2485
+          },
+          {
+            "capture_ms": 14.6464,
+            "format_ms": 90.3941,
+            "commit_ms": 47.366,
+            "total_ms": 153.1019,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 75.1682
+          },
+          {
+            "capture_ms": 15.4807,
+            "format_ms": 73.5452,
+            "commit_ms": 37.5514,
+            "total_ms": 127.0853,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 17.6438
+          },
+          {
+            "capture_ms": 8.8531,
+            "format_ms": 69.5719,
+            "commit_ms": 36.7537,
+            "total_ms": 115.7548,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 52.8084
+          },
+          {
+            "capture_ms": 8.9427,
+            "format_ms": 62.8057,
+            "commit_ms": 37.2046,
+            "total_ms": 109.5186,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 24.3762
+          },
+          {
+            "capture_ms": 10.2094,
+            "format_ms": 64.3102,
+            "commit_ms": 36.281,
+            "total_ms": 111.3176,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.0129
+          },
+          {
+            "capture_ms": 8.8825,
+            "format_ms": 46.9773,
+            "commit_ms": 35.1725,
+            "total_ms": 91.7288,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 27.4321
+          },
+          {
+            "capture_ms": 8.7112,
+            "format_ms": 47.0929,
+            "commit_ms": 36.131,
+            "total_ms": 92.4613,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 16.1791
+          },
+          {
+            "capture_ms": 8.932,
+            "format_ms": 58.2587,
+            "commit_ms": 35.2103,
+            "total_ms": 103.083,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.2088
+          },
+          {
+            "capture_ms": 8.706,
+            "format_ms": 56.9579,
+            "commit_ms": 33.8591,
+            "total_ms": 100.0202,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.0318
+          },
+          {
+            "capture_ms": 8.7652,
+            "format_ms": 48.167,
+            "commit_ms": 35.6268,
+            "total_ms": 93.093,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 19.8426
+          },
+          {
+            "capture_ms": 8.7559,
+            "format_ms": 47.2216,
+            "commit_ms": 41.5429,
+            "total_ms": 97.9576,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.0172
+          },
+          {
+            "capture_ms": 9.4885,
+            "format_ms": 65.1892,
+            "commit_ms": 34.2563,
+            "total_ms": 109.4634,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.0241
+          },
+          {
+            "capture_ms": 8.8922,
+            "format_ms": 48.7699,
+            "commit_ms": 43.6046,
+            "total_ms": 101.7356,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 24.2473
+          },
+          {
+            "capture_ms": 8.8237,
+            "format_ms": 48.9772,
+            "commit_ms": 36.979,
+            "total_ms": 95.3208,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 17.8408
+          },
+          {
+            "capture_ms": 8.8318,
+            "format_ms": 71.9263,
+            "commit_ms": 46.47,
+            "total_ms": 130.1814,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 56.8243
+          },
+          {
+            "capture_ms": 11.981,
+            "format_ms": 54.3018,
+            "commit_ms": 36.8285,
+            "total_ms": 103.6507,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.0459
+          },
+          {
+            "capture_ms": 8.8181,
+            "format_ms": 54.4103,
+            "commit_ms": 33.6454,
+            "total_ms": 97.4536,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 20.938
+          },
+          {
+            "capture_ms": 9.0183,
+            "format_ms": 59.4328,
+            "commit_ms": 32.493,
+            "total_ms": 101.4448,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 24.3383
+          },
+          {
+            "capture_ms": 9.1585,
+            "format_ms": 50.6139,
+            "commit_ms": 35.7175,
+            "total_ms": 96.1026,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.1131
+          },
+          {
+            "capture_ms": 8.9535,
+            "format_ms": 62.8661,
+            "commit_ms": 32.7418,
+            "total_ms": 105.1246,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 23.2524
+          },
+          {
+            "capture_ms": 8.9404,
+            "format_ms": 46.2628,
+            "commit_ms": 32.2606,
+            "total_ms": 87.9471,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.009
+          },
+          {
+            "capture_ms": 8.9294,
+            "format_ms": 69.5361,
+            "commit_ms": 32.6633,
+            "total_ms": 111.6416,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 15.9608
+          },
+          {
+            "capture_ms": 12.1905,
+            "format_ms": 46.7882,
+            "commit_ms": 32.9245,
+            "total_ms": 92.4842,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 23.8897
+          },
+          {
+            "capture_ms": 8.9778,
+            "format_ms": 48.7404,
+            "commit_ms": 32.6773,
+            "total_ms": 90.9432,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 19.4263
+          },
+          {
+            "capture_ms": 9.6115,
+            "format_ms": 50.5856,
+            "commit_ms": 37.7055,
+            "total_ms": 98.4536,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.093
+          },
+          {
+            "capture_ms": 14.9394,
+            "format_ms": 46.1651,
+            "commit_ms": 39.1201,
+            "total_ms": 100.7654,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 18.3967
+          },
+          {
+            "capture_ms": 8.8699,
+            "format_ms": 46.7275,
+            "commit_ms": 34.3687,
+            "total_ms": 90.4381,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 26.6566
+          },
+          {
+            "capture_ms": 8.9182,
+            "format_ms": 78.4699,
+            "commit_ms": 38.0253,
+            "total_ms": 125.9911,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 24.2061
+          },
+          {
+            "capture_ms": 8.8995,
+            "format_ms": 63.6859,
+            "commit_ms": 43.7031,
+            "total_ms": 116.9999,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 19.4541
+          },
+          {
+            "capture_ms": 9.0776,
+            "format_ms": 67.0368,
+            "commit_ms": 34.0665,
+            "total_ms": 110.7812,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 47.5729
+          },
+          {
+            "capture_ms": 12.5293,
+            "format_ms": 58.961,
+            "commit_ms": 34.2763,
+            "total_ms": 106.2828,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 24.6241
+          },
+          {
+            "capture_ms": 11.4842,
+            "format_ms": 54.7314,
+            "commit_ms": 34.259,
+            "total_ms": 100.9663,
+            "output_bytes": 3304949,
+            "core_peak_bytes": 20401110,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 19.9349
+          }
+        ]
+      },
+      "warmups": 5,
+      "samples": 30,
+      "output_bytes": 3304949,
+      "p95_ms": {
+        "capture_ms": 12.5293,
+        "format_ms": 71.9263,
+        "commit_ms": 43.7031,
+        "total_ms": 125.9911
+      },
+      "core_peak_bytes": 20401110,
+      "working_set_peak_delta_bytes": 117690368,
+      "ui_ticks": 111,
+      "ui_max_gap_ms": 56.8243,
+      "capture_gate": "passed",
+      "commit_gate": "passed"
+    },
+    {
+      "native": {
+        "schema": 1,
+        "complete": true,
+        "input_bytes": 5242880,
+        "mode": "Compact",
+        "host_version_code": 525269,
+        "compiler_version": 194435229,
+        "ui_thread": 11648,
+        "worker_scintilla_calls": 0,
+        "timer_period_ms": 10,
+        "setup_settle_ms": 100,
+        "failure_stage": 0,
+        "failure_code": 0,
+        "working_set_base_bytes": 30711808,
+        "working_set_final_bytes": 111067136,
+        "working_set_peak_bytes": 138797056,
+        "executions": 35,
+        "runs": [
+          {
+            "capture_ms": 9.027,
+            "format_ms": 62.8376,
+            "commit_ms": 322.1271,
+            "total_ms": 397.0113,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 1,
+            "ui_max_gap_ms": 62.6913
+          },
+          {
+            "capture_ms": 8.9182,
+            "format_ms": 56.84,
+            "commit_ms": 275.7602,
+            "total_ms": 342.0509,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 15.9969
+          },
+          {
+            "capture_ms": 10.0069,
+            "format_ms": 59.1825,
+            "commit_ms": 302.7487,
+            "total_ms": 372.4211,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.008
+          },
+          {
+            "capture_ms": 9.4363,
+            "format_ms": 64.6278,
+            "commit_ms": 294.005,
+            "total_ms": 368.723,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.0484
+          },
+          {
+            "capture_ms": 8.9343,
+            "format_ms": 75.0749,
+            "commit_ms": 239.1911,
+            "total_ms": 323.7174,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 6,
+            "ui_max_gap_ms": 16.0581
+          },
+          {
+            "capture_ms": 12.6147,
+            "format_ms": 53.354,
+            "commit_ms": 250.0616,
+            "total_ms": 316.5929,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 23.8078
+          },
+          {
+            "capture_ms": 16.0405,
+            "format_ms": 50.6412,
+            "commit_ms": 273.2786,
+            "total_ms": 340.49,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.0609
+          },
+          {
+            "capture_ms": 8.5538,
+            "format_ms": 42.369,
+            "commit_ms": 290.5517,
+            "total_ms": 341.9518,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 19.355
+          },
+          {
+            "capture_ms": 14.3563,
+            "format_ms": 52.5545,
+            "commit_ms": 280.8039,
+            "total_ms": 363.2189,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 48.4446
+          },
+          {
+            "capture_ms": 9.5195,
+            "format_ms": 43.0036,
+            "commit_ms": 250.5304,
+            "total_ms": 303.7457,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 2,
+            "ui_max_gap_ms": 40.774
+          },
+          {
+            "capture_ms": 8.7141,
+            "format_ms": 51.1499,
+            "commit_ms": 322.1454,
+            "total_ms": 382.5197,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.5166
+          },
+          {
+            "capture_ms": 8.5345,
+            "format_ms": 56.2171,
+            "commit_ms": 257.7829,
+            "total_ms": 323.1392,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.0049
+          },
+          {
+            "capture_ms": 8.9061,
+            "format_ms": 56.6128,
+            "commit_ms": 299.3426,
+            "total_ms": 365.4184,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 15.993
+          },
+          {
+            "capture_ms": 8.6448,
+            "format_ms": 45.0432,
+            "commit_ms": 280.1534,
+            "total_ms": 334.3959,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 20.3598
+          },
+          {
+            "capture_ms": 9.4904,
+            "format_ms": 42.5434,
+            "commit_ms": 327.982,
+            "total_ms": 380.5869,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 15.9708
+          },
+          {
+            "capture_ms": 8.5976,
+            "format_ms": 53.8681,
+            "commit_ms": 255.9579,
+            "total_ms": 318.9595,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 31.539
+          },
+          {
+            "capture_ms": 9.0017,
+            "format_ms": 59.419,
+            "commit_ms": 289.0317,
+            "total_ms": 357.948,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.0081
+          },
+          {
+            "capture_ms": 8.9147,
+            "format_ms": 42.7165,
+            "commit_ms": 287.7862,
+            "total_ms": 339.9106,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 15.979
+          },
+          {
+            "capture_ms": 12.6991,
+            "format_ms": 57.8064,
+            "commit_ms": 271.0393,
+            "total_ms": 342.0915,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 15.9897
+          },
+          {
+            "capture_ms": 10.5189,
+            "format_ms": 72.2311,
+            "commit_ms": 273.077,
+            "total_ms": 356.3941,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 27.6162
+          },
+          {
+            "capture_ms": 8.6347,
+            "format_ms": 61.1727,
+            "commit_ms": 350.106,
+            "total_ms": 420.5079,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 19.8183
+          },
+          {
+            "capture_ms": 8.8408,
+            "format_ms": 42.5947,
+            "commit_ms": 280.9883,
+            "total_ms": 332.9649,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 15.979
+          },
+          {
+            "capture_ms": 8.9241,
+            "format_ms": 52.0352,
+            "commit_ms": 251.2495,
+            "total_ms": 312.7106,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 30.0446
+          },
+          {
+            "capture_ms": 9.6263,
+            "format_ms": 55.2095,
+            "commit_ms": 350.9664,
+            "total_ms": 416.271,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 22.277
+          },
+          {
+            "capture_ms": 8.8101,
+            "format_ms": 69.2838,
+            "commit_ms": 288.2783,
+            "total_ms": 366.9101,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 18.4037
+          },
+          {
+            "capture_ms": 9.1061,
+            "format_ms": 45.7945,
+            "commit_ms": 288.7172,
+            "total_ms": 344.1482,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 24.1104
+          },
+          {
+            "capture_ms": 8.5272,
+            "format_ms": 57.5264,
+            "commit_ms": 321.7423,
+            "total_ms": 388.6993,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 17.7755
+          },
+          {
+            "capture_ms": 9.1626,
+            "format_ms": 44.5732,
+            "commit_ms": 337.0923,
+            "total_ms": 391.344,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 22.448
+          },
+          {
+            "capture_ms": 8.6359,
+            "format_ms": 63,
+            "commit_ms": 280.4078,
+            "total_ms": 352.5733,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.0028
+          },
+          {
+            "capture_ms": 16.4771,
+            "format_ms": 42.9134,
+            "commit_ms": 282.3033,
+            "total_ms": 342.2531,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 17.6673
+          },
+          {
+            "capture_ms": 9.1408,
+            "format_ms": 61.1353,
+            "commit_ms": 351.7586,
+            "total_ms": 422.6532,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.0704
+          },
+          {
+            "capture_ms": 8.8693,
+            "format_ms": 46.4497,
+            "commit_ms": 311.2615,
+            "total_ms": 367.0703,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 3,
+            "ui_max_gap_ms": 23.6191
+          },
+          {
+            "capture_ms": 9.1017,
+            "format_ms": 61.0994,
+            "commit_ms": 300.2686,
+            "total_ms": 370.9913,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 4,
+            "ui_max_gap_ms": 16.9805
+          },
+          {
+            "capture_ms": 15.9678,
+            "format_ms": 61.7981,
+            "commit_ms": 256.555,
+            "total_ms": 334.8951,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.1324
+          },
+          {
+            "capture_ms": 9.4375,
+            "format_ms": 62.3071,
+            "commit_ms": 257.4787,
+            "total_ms": 330.015,
+            "output_bytes": 1782279,
+            "core_peak_bytes": 15833098,
+            "ui_ticks": 5,
+            "ui_max_gap_ms": 16.0103
+          }
+        ]
+      },
+      "warmups": 5,
+      "samples": 30,
+      "output_bytes": 1782279,
+      "p95_ms": {
+        "capture_ms": 16.0405,
+        "format_ms": 69.2838,
+        "commit_ms": 350.9664,
+        "total_ms": 420.5079
+      },
+      "core_peak_bytes": 15833098,
+      "working_set_peak_delta_bytes": 108085248,
+      "ui_ticks": 112,
+      "ui_max_gap_ms": 48.4446,
+      "capture_gate": "passed",
+      "commit_gate": "failed"
+    }
+  ],
+  "errors": [],
+  "discrepancies": [
+    "reference-storage-not-verified",
+    "other-release-gates-pending",
+    "windows10-differs-from-windows11-reference",
+    "reference-ram-below-16GiB",
+    "1048576-Compact-commit_gate-p95-at-least-50ms",
+    "5242880-Compact-commit_gate-p95-at-least-50ms"
+  ],
+  "reference_nfr002": "not-promoted",
+  "other_release_gates": "pending",
+  "release_blocked": true
+}

@@ -22,6 +22,9 @@ bool CoreBudget::acquire(std::size_t bytes) noexcept {
     do {
         if (bytes > MaxCoreBytes - current) { return false; }
     } while (!used_.compare_exchange_weak(current, current + bytes));
+    const auto acquired{current + bytes};
+    auto high{peak_.load()};
+    while (high < acquired && !peak_.compare_exchange_weak(high, acquired)) {}
     return true;
 }
 void CoreBudget::release(std::size_t bytes) noexcept { used_.fetch_sub(bytes); }

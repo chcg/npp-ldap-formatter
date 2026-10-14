@@ -4,6 +4,7 @@ project(NppLdapFormatter VERSION 0.1.0 LANGUAGES NONE)
 include(cmake/Baseline.cmake)
 
 option(NPP_LDAP_MANIFEST_ONLY "Validar SDK/manifiesto sin compilar C++" OFF)
+option(NPP_LDAP_NATIVE_UI_BENCHMARK "Build isolated native UI benchmark (never packaged)" OFF)
 set(NPP_LDAP_SDK_ROOT "${CMAKE_SOURCE_DIR}/.build/notepad-plus-plus" CACHE PATH "Checkout fijado de headers oficiales")
 if(NOT NPP_LDAP_MANIFEST_ONLY)
     if(NOT WIN32 OR NOT CMAKE_GENERATOR STREQUAL "Visual Studio 17 2022")
@@ -108,8 +109,36 @@ if(NOT NPP_LDAP_MANIFEST_ONLY)
     target_link_options(NppLdapFormatter PRIVATE /WX)
     set_target_properties(NppLdapFormatter PROPERTIES PREFIX "")
 
+    if(NPP_LDAP_NATIVE_UI_BENCHMARK)
+        if(NOT CMAKE_VS_PLATFORM_NAME STREQUAL "x64")
+            message(FATAL_ERROR "Native UI benchmark requires Windows x64.")
+        endif()
+        add_library(NativeUiBenchmark MODULE tests/NativeUiBenchmark.cpp tests/NativeUiBenchmark.def)
+        target_include_directories(NativeUiBenchmark PRIVATE "${NPP_LDAP_SDK_ROOT}/PowerEditor/src")
+        target_link_libraries(NativeUiBenchmark PRIVATE ldap_gateway psapi)
+        target_link_options(NativeUiBenchmark PRIVATE /WX)
+        set_target_properties(NativeUiBenchmark PROPERTIES PREFIX "")
+        string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" compiler_parts "${CMAKE_CXX_COMPILER_VERSION}")
+        math(EXPR benchmark_compiler_full "${CMAKE_MATCH_1} * 10000000 + ${CMAKE_MATCH_2} * 100000 + ${CMAKE_MATCH_3}")
+        file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/$<CONFIG>/native-benchmark-template.json"
+            CONTENT "{\"configuration\":\"$<CONFIG>\",\"architecture\":\"x64\",\"runtime\":\"MultiThreaded\",\"compiler\":\"${CMAKE_CXX_COMPILER_VERSION}\",\"compiler_full_version\":${benchmark_compiler_full},\"toolset\":\"${NPP_LDAP_TOOLSET_VERSION}\",\"windows_sdk\":\"${NPP_LDAP_WINDOWS_SDK}\",\"sdk_revision\":\"${sdk_revision}\",\"scintilla_version\":\"${NPP_LDAP_SCINTILLA_VERSION}\"}\n")
+        add_custom_command(TARGET NativeUiBenchmark POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" "-DDLL=$<TARGET_FILE:NativeUiBenchmark>"
+                "-DTEMPLATE=${CMAKE_BINARY_DIR}/$<CONFIG>/native-benchmark-template.json"
+                "-DOUTPUT=$<TARGET_FILE_DIR:NativeUiBenchmark>/native-benchmark-build.json"
+                "-DROOT=${CMAKE_SOURCE_DIR}" "-DGIT=${GIT_EXECUTABLE}"
+                -P "${CMAKE_SOURCE_DIR}/cmake/BenchmarkMetadata.cmake"
+            VERBATIM)
+    endif()
+
     include(CTest)
     if(BUILD_TESTING)
+        add_executable(native_benchmark_fixture_tests tests/NativeBenchmarkFixtureTests.cpp)
+        target_link_libraries(native_benchmark_fixture_tests PRIVATE ldap_core npp_ldap_build_options)
+        add_test(NAME native_benchmark_fixture_tests COMMAND native_benchmark_fixture_tests)
+        add_executable(native_benchmark_state_tests tests/NativeBenchmarkStateTests.cpp)
+        target_link_libraries(native_benchmark_state_tests PRIVATE ldap_gateway)
+        add_test(NAME native_benchmark_state_tests COMMAND native_benchmark_state_tests)
         add_executable(ldap_parser_tests tests/LdapParserTests.cpp)
         target_link_libraries(ldap_parser_tests PRIVATE ldap_core)
         target_compile_options(ldap_parser_tests PRIVATE /W4 /WX /permissive- /utf-8 /EHsc)

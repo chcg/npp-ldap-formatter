@@ -43,6 +43,7 @@ public:
     };
     [[nodiscard]] std::optional<Reservation> reserve(std::size_t bytes);
     [[nodiscard]] std::size_t used() const noexcept { return used_.load(); }
+    [[nodiscard]] std::size_t peak() const noexcept { return peak_.load(); }
     [[nodiscard]] std::size_t remaining() const noexcept { return MaxCoreBytes - used(); }
 private:
     // Conservative bound for this object and its shared ownership control block.
@@ -52,6 +53,7 @@ private:
     [[nodiscard]] bool acquire(std::size_t bytes) noexcept;
     void release(std::size_t bytes) noexcept;
     std::atomic<std::size_t> used_{MetadataBytes};
+    std::atomic<std::size_t> peak_{MetadataBytes};
 };
 
 template<class T> class BudgetAllocator {
