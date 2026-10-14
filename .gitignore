@@ -35,3 +35,4 @@ graphify-out/
 
 # Codex configuration and session artifacts stay local.
 .codex/
+.agents/
