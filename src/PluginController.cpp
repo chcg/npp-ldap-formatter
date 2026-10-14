@@ -277,11 +277,10 @@ void PluginController::notified(const SCNotification* notification) noexcept {
 }
 void PluginController::processViewNotification(const SCNotification& notification, UINT code, HWND origin) noexcept {
     auto scope{gateway_.identity()};
-    if (code == SCN_UPDATEUI && (notification.updated & SC_UPDATE_SELECTION) && restoreBatch_ && !restoring_) {
+    if (code == SCN_UPDATEUI && (notification.updated & SC_UPDATE_SELECTION) && !applying_ && !restoring_) {
         if (!scope || scope->view != origin) { return; }
-        // Without native-order evidence, a post-terminal selection update may
-        // be deliberate. Discard instead of overwriting the user's selection.
-        ++restoreEpoch_; restoreBatch_.reset(); undoRedo_ = false;
+        // Deliberate selection changes supersede work, diagnostics and queued restoration.
+        invalidateWork();
         return;
     }
     if (code != SCN_MODIFIED) { return; }

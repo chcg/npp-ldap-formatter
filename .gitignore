@@ -17,13 +17,21 @@ CMakeFiles/
 # BMad ephemeral render cache
 _bmad/render/
 __pycache__/
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/graphify/
 _bmad/
 _bmad-output/
 *.pyc
 .uv-cache/
 
 # Archivos de contexto y wrappers locales de BMad
-AGENTS.md
 bmad-prep.cmd
 project-context/
+
+# Graphify outputs are local and rebuilt by the installed Git hooks.
+graphify-out/
+
+# Codex configuration and session artifacts stay local.
+.codex/
