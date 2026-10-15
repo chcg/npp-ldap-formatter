@@ -101,6 +101,7 @@ def run(harness: Path, dll: Path, revision: str) -> dict:
     dll_identity = inspect_pe(dll)
     if harness_identity["machine"] != dll_identity["machine"]:
         raise ValueError("Harness and DLL must share architecture")
+    # shortcut: approved local harness only; bound pipes before supporting arbitrary runners.
     completed = subprocess.run([str(harness.resolve()), str(dll.resolve())], capture_output=True, timeout=60, check=False)
     # Never relay raw stdout/stderr; only strict numeric/enumerated metadata may
     # cross the persistence boundary. Malformed output fails closed.
@@ -109,7 +110,7 @@ def run(harness: Path, dll: Path, revision: str) -> dict:
     except (UnicodeError, json.JSONDecodeError) as error:
         raise ValueError("Harness did not return valid metadata") from error
     validate_summary(summary)
-    if completed.returncode != 0 or summary["failures"]:
+    if completed.returncode != 0 or completed.stderr or summary["failures"]:
         raise ValueError("DLL E2E failed; certification refused")
     return consolidate(summary, dll_identity, revision)
 

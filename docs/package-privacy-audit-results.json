@@ -1,0 +1,635 @@
+{
+  "schema": 1,
+  "ticket": "4.3",
+  "audit_date": "2026-10-15",
+  "source_revision": "6b5dd197d41dd701558eaaf69690dc155b916a6f",
+  "source_digest": "0d66a888765dd738042eb4797919df6d0e772c6550316319b84190edab5325f8",
+  "source_inputs": [
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "93831147d0cb69fdce00feac4d058b8e09cbff81626ded12d14c8cd890997577"
+    },
+    {
+      "path": "CMakePresets.json",
+      "sha256": "e474d8278dc13300b99bdeca572f62e05087c04cad2ed3f9205dbd5aa9ac170f"
+    },
+    {
+      "path": "cmake/Baseline.cmake",
+      "sha256": "687726f494149e4d898e964f74674866e315b10e3fbc2ddab588981087c58bef"
+    },
+    {
+      "path": "include/BuildInfo.hpp",
+      "sha256": "772d383476b57c904ea961f7b55835338eb9025229337caad54d845714cdd551"
+    },
+    {
+      "path": "include/CoreBudget.hpp",
+      "sha256": "7a192957ba4ac2b4a88dd4e2e3ff7a23e8712542af389d7c12aaa9adac6f75c9"
+    },
+    {
+      "path": "include/LdapParser.hpp",
+      "sha256": "094ca5400e6040d96a5d8b24a58fca9432e63faf4583d3fe13e954d601abe7d3"
+    },
+    {
+      "path": "include/PluginController.hpp",
+      "sha256": "48fc55ddf18fb927cae9e3e6179dc51977a4f705325ea255c1d7adf2ec7ad6eb"
+    },
+    {
+      "path": "include/PluginDefinition.hpp",
+      "sha256": "2fbf73a82b2b98bd8202642b2eee537e8e5fc03e360be215d2f4a2496ee5ec28"
+    },
+    {
+      "path": "include/ScintillaGateway.hpp",
+      "sha256": "bdb96fdb485d1c2ec05108790620a5a8d74111e3cef7902a5b1d512d04626f62"
+    },
+    {
+      "path": "src/BuildInfo.cpp",
+      "sha256": "f6ee1c113c4a5af2b32293e97859e1ef879e1d00c38cccdfc5480c291f7e1cf5"
+    },
+    {
+      "path": "src/CoreBudget.cpp",
+      "sha256": "56a83372a164123da876432502cc46c55c916772034351c3d9de806602f13b68"
+    },
+    {
+      "path": "src/LdapParser.cpp",
+      "sha256": "7a86f0ede820f186ee00b43499279b24ac4b54692cb812a32737423c0ad3afea"
+    },
+    {
+      "path": "src/PluginController.cpp",
+      "sha256": "09c0a8ab03887cd1cfcd79e99432c9e50cd465a8d951a820b8f8dbb2e01f5a72"
+    },
+    {
+      "path": "src/PluginDefinition.cpp",
+      "sha256": "8cd2e7748346de39ea2ea5eec3a314220f9d8fab9779f92af15ead4a7fef7ad0"
+    },
+    {
+      "path": "src/PluginDiagnostics.cpp",
+      "sha256": "694701e76e5e2676e3a969101d6a824688de5652bc297009a3273ef5a5e58fef"
+    },
+    {
+      "path": "src/PluginExports.cpp",
+      "sha256": "4566fe1cc9ea949d6b688145b66f0ff652b0b7ffcf45326a9374fa9f618fc874"
+    },
+    {
+      "path": "src/PluginExports.def",
+      "sha256": "3fdbc6b4ecce84ac41125e1cfdd0b976a707fc9f9b66075c8c6849f61e65d071"
+    },
+    {
+      "path": "src/PluginMessages.hpp",
+      "sha256": "b7f85349d8d932904db1b46c55c18e25e2fcbf3065600cf310557c42762116ef"
+    },
+    {
+      "path": "src/PluginWorker.cpp",
+      "sha256": "e03b12e6b9ec14dde47b0a8fa10e4f2ecc17d0906d666897f1739e0626bbadf9"
+    },
+    {
+      "path": "src/ScintillaGateway.cpp",
+      "sha256": "31854087abf61c2ff88b12273bb6d9684563ed6f2642eb54148441187a49b81c"
+    }
+  ],
+  "approved_x64_tuple": {
+    "schema": 1,
+    "revision": "6b5dd197d41dd701558eaaf69690dc155b916a6f",
+    "architecture": "x64",
+    "archive_sha256": "b64fcad825c2c1f00413d20d95be9e41483716cadcd19a1718caa952bf384292",
+    "dll_sha256": "adeba51265876f02b19d0ca462090457ae5d99cc504eb7a5d4c63ef3c5307ef0",
+    "harness_sha256": "6bac0dbbbd46051009afb88c479459bc34b0563a7a5fc68761df59f1d1bd9531",
+    "suite_cases": 103
+  },
+  "privacy": {
+    "scope": "reviewed-production-source-and-static-package-imports",
+    "source_network_sinks": 0,
+    "source_telemetry_sinks": 0,
+    "source_document_persistence_sinks": 0,
+    "runtime_system_trace": "not-measured",
+    "whole_host_privacy": "not-certified"
+  },
+  "build_matrix": {
+    "configuration": "Release",
+    "runtime": "MultiThreaded",
+    "x86": "passed",
+    "x64": "passed",
+    "ARM64": "cross-build-passed"
+  },
+  "artifacts": [
+    {
+      "architecture": "x86",
+      "dll_bytes": 188416,
+      "dll_sha256": "75248703f3c67aeb716e8c321f7a0b0941f7dbd60468edba99a062d672077e46",
+      "archive_sha256": "072f4f92f9c33982484203d7906e871e27624b1ac4426d2250af19488426bb42",
+      "runtime": "MultiThreaded",
+      "pe": "passed",
+      "exports": [
+        "beNotified",
+        "getFuncsArray",
+        "getName",
+        "isUnicode",
+        "messageProc",
+        "setInfo"
+      ],
+      "import_libraries": [
+        "kernel32.dll",
+        "user32.dll"
+      ],
+      "imported_crt_io_apis": [
+        "CreateFileW",
+        "WriteFile",
+        "GetProcAddress",
+        "LoadLibraryExW"
+      ],
+      "abi_harness_exists": false,
+      "e2e_harness_exists": false,
+      "imported_functions": {
+        "user32.dll": [
+          "CreateWindowExW",
+          "DefWindowProcW",
+          "DestroyWindow",
+          "GetWindowLongW",
+          "GetWindowThreadProcessId",
+          "IsWindow",
+          "KillTimer",
+          "MessageBoxW",
+          "PostMessageW",
+          "RegisterClassW",
+          "SendMessageW",
+          "SetTimer",
+          "SetWindowLongW",
+          "UnregisterClassW"
+        ],
+        "kernel32.dll": [
+          "AcquireSRWLockExclusive",
+          "CloseHandle",
+          "CreateFileW",
+          "CreateThread",
+          "DecodePointer",
+          "DeleteCriticalSection",
+          "EncodePointer",
+          "EnterCriticalSection",
+          "ExitProcess",
+          "ExitThread",
+          "FindClose",
+          "FindFirstFileExW",
+          "FindNextFileW",
+          "FlsAlloc",
+          "FlsFree",
+          "FlsGetValue",
+          "FlsSetValue",
+          "FlushFileBuffers",
+          "FreeEnvironmentStringsW",
+          "FreeLibrary",
+          "FreeLibraryAndExitThread",
+          "GetACP",
+          "GetCPInfo",
+          "GetCommandLineA",
+          "GetCommandLineW",
+          "GetConsoleMode",
+          "GetConsoleOutputCP",
+          "GetCurrentProcess",
+          "GetCurrentProcessId",
+          "GetCurrentThreadId",
+          "GetEnvironmentStringsW",
+          "GetExitCodeThread",
+          "GetFileType",
+          "GetLastError",
+          "GetModuleFileNameW",
+          "GetModuleHandleExW",
+          "GetModuleHandleW",
+          "GetOEMCP",
+          "GetProcAddress",
+          "GetProcessHeap",
+          "GetStartupInfoW",
+          "GetStdHandle",
+          "GetStringTypeW",
+          "GetSystemTimeAsFileTime",
+          "HeapAlloc",
+          "HeapFree",
+          "HeapReAlloc",
+          "HeapSize",
+          "InitializeCriticalSectionAndSpinCount",
+          "InitializeCriticalSectionEx",
+          "InitializeSListHead",
+          "InterlockedFlushSList",
+          "IsDebuggerPresent",
+          "IsProcessorFeaturePresent",
+          "IsValidCodePage",
+          "LCMapStringW",
+          "LeaveCriticalSection",
+          "LoadLibraryExW",
+          "MultiByteToWideChar",
+          "QueryPerformanceCounter",
+          "RaiseException",
+          "ReleaseSRWLockExclusive",
+          "RtlUnwind",
+          "SetFilePointerEx",
+          "SetLastError",
+          "SetStdHandle",
+          "SetUnhandledExceptionFilter",
+          "SleepConditionVariableSRW",
+          "TerminateProcess",
+          "TlsAlloc",
+          "TlsFree",
+          "TlsGetValue",
+          "TlsSetValue",
+          "TryAcquireSRWLockExclusive",
+          "UnhandledExceptionFilter",
+          "VirtualProtect",
+          "VirtualQuery",
+          "WaitForSingleObjectEx",
+          "WakeAllConditionVariable",
+          "WakeConditionVariable",
+          "WideCharToMultiByte",
+          "WriteConsoleW",
+          "WriteFile"
+        ]
+      }
+    },
+    {
+      "architecture": "x64",
+      "dll_bytes": 244736,
+      "dll_sha256": "adeba51265876f02b19d0ca462090457ae5d99cc504eb7a5d4c63ef3c5307ef0",
+      "archive_sha256": "b64fcad825c2c1f00413d20d95be9e41483716cadcd19a1718caa952bf384292",
+      "runtime": "MultiThreaded",
+      "pe": "passed",
+      "exports": [
+        "beNotified",
+        "getFuncsArray",
+        "getName",
+        "isUnicode",
+        "messageProc",
+        "setInfo"
+      ],
+      "import_libraries": [
+        "kernel32.dll",
+        "user32.dll"
+      ],
+      "imported_crt_io_apis": [
+        "CreateFileW",
+        "WriteFile",
+        "GetProcAddress",
+        "LoadLibraryExW"
+      ],
+      "abi_harness_exists": true,
+      "e2e_harness_exists": true,
+      "imported_functions": {
+        "user32.dll": [
+          "CreateWindowExW",
+          "DefWindowProcW",
+          "DestroyWindow",
+          "GetWindowLongPtrW",
+          "GetWindowThreadProcessId",
+          "IsWindow",
+          "KillTimer",
+          "MessageBoxW",
+          "PostMessageW",
+          "RegisterClassW",
+          "SendMessageW",
+          "SetTimer",
+          "SetWindowLongPtrW",
+          "UnregisterClassW"
+        ],
+        "kernel32.dll": [
+          "AcquireSRWLockExclusive",
+          "CloseHandle",
+          "CreateFileW",
+          "CreateThread",
+          "DeleteCriticalSection",
+          "EncodePointer",
+          "EnterCriticalSection",
+          "ExitProcess",
+          "ExitThread",
+          "FindClose",
+          "FindFirstFileExW",
+          "FindNextFileW",
+          "FlsAlloc",
+          "FlsFree",
+          "FlsGetValue",
+          "FlsSetValue",
+          "FlushFileBuffers",
+          "FreeEnvironmentStringsW",
+          "FreeLibrary",
+          "FreeLibraryAndExitThread",
+          "GetACP",
+          "GetCPInfo",
+          "GetCommandLineA",
+          "GetCommandLineW",
+          "GetConsoleMode",
+          "GetConsoleOutputCP",
+          "GetCurrentProcess",
+          "GetCurrentProcessId",
+          "GetCurrentThreadId",
+          "GetEnvironmentStringsW",
+          "GetExitCodeThread",
+          "GetFileType",
+          "GetLastError",
+          "GetModuleFileNameW",
+          "GetModuleHandleExW",
+          "GetModuleHandleW",
+          "GetOEMCP",
+          "GetProcAddress",
+          "GetProcessHeap",
+          "GetStartupInfoW",
+          "GetStdHandle",
+          "GetStringTypeW",
+          "GetSystemTimeAsFileTime",
+          "HeapAlloc",
+          "HeapFree",
+          "HeapReAlloc",
+          "HeapSize",
+          "InitializeCriticalSectionAndSpinCount",
+          "InitializeCriticalSectionEx",
+          "InitializeSListHead",
+          "InterlockedFlushSList",
+          "IsDebuggerPresent",
+          "IsProcessorFeaturePresent",
+          "IsValidCodePage",
+          "LCMapStringW",
+          "LeaveCriticalSection",
+          "LoadLibraryExW",
+          "MultiByteToWideChar",
+          "QueryPerformanceCounter",
+          "RaiseException",
+          "ReleaseSRWLockExclusive",
+          "RtlCaptureContext",
+          "RtlLookupFunctionEntry",
+          "RtlPcToFileHeader",
+          "RtlUnwindEx",
+          "RtlVirtualUnwind",
+          "SetFilePointerEx",
+          "SetLastError",
+          "SetStdHandle",
+          "SetUnhandledExceptionFilter",
+          "SleepConditionVariableSRW",
+          "TerminateProcess",
+          "TlsAlloc",
+          "TlsFree",
+          "TlsGetValue",
+          "TlsSetValue",
+          "TryAcquireSRWLockExclusive",
+          "UnhandledExceptionFilter",
+          "VirtualProtect",
+          "VirtualQuery",
+          "WaitForSingleObjectEx",
+          "WakeAllConditionVariable",
+          "WakeConditionVariable",
+          "WideCharToMultiByte",
+          "WriteConsoleW",
+          "WriteFile"
+        ]
+      }
+    },
+    {
+      "architecture": "ARM64",
+      "dll_bytes": 214528,
+      "dll_sha256": "83c6df11e31479b273273880fb867ab2ecbefc743f42504616a94da49d72be33",
+      "archive_sha256": "a6e0695db4ebcbb656fc8b2d1698d61ebdf6684ac6f3f51377724a8aca36674c",
+      "runtime": "MultiThreaded",
+      "pe": "passed",
+      "exports": [
+        "beNotified",
+        "getFuncsArray",
+        "getName",
+        "isUnicode",
+        "messageProc",
+        "setInfo"
+      ],
+      "import_libraries": [
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "kernel32.dll",
+        "user32.dll"
+      ],
+      "imported_crt_io_apis": [
+        "CreateFileW",
+        "WriteFile",
+        "GetProcAddress",
+        "LoadLibraryExW"
+      ],
+      "abi_harness_exists": true,
+      "e2e_harness_exists": true,
+      "imported_functions": {
+        "user32.dll": [
+          "CreateWindowExW",
+          "DefWindowProcW",
+          "DestroyWindow",
+          "GetWindowLongPtrW",
+          "GetWindowThreadProcessId",
+          "IsWindow",
+          "KillTimer",
+          "MessageBoxW",
+          "PostMessageW",
+          "RegisterClassW",
+          "SendMessageW",
+          "SetTimer",
+          "SetWindowLongPtrW",
+          "UnregisterClassW"
+        ],
+        "kernel32.dll": [
+          "AcquireSRWLockExclusive",
+          "CloseHandle",
+          "CreateFileW",
+          "CreateThread",
+          "DeleteCriticalSection",
+          "EncodePointer",
+          "EnterCriticalSection",
+          "ExitProcess",
+          "ExitThread",
+          "FindClose",
+          "FindFirstFileExW",
+          "FindNextFileW",
+          "FlsAlloc",
+          "FlsFree",
+          "FlsGetValue",
+          "FlsSetValue",
+          "FlushFileBuffers",
+          "FreeEnvironmentStringsW",
+          "FreeLibrary",
+          "FreeLibraryAndExitThread",
+          "GetACP",
+          "GetCPInfo",
+          "GetCommandLineA",
+          "GetCommandLineW",
+          "GetConsoleMode",
+          "GetConsoleOutputCP",
+          "GetCurrentProcess",
+          "GetCurrentProcessId",
+          "GetCurrentThreadId",
+          "GetEnvironmentStringsW",
+          "GetExitCodeThread",
+          "GetFileType",
+          "GetLastError",
+          "GetModuleFileNameW",
+          "GetModuleHandleExW",
+          "GetModuleHandleW",
+          "GetOEMCP",
+          "GetProcAddress",
+          "GetProcessHeap",
+          "GetStartupInfoW",
+          "GetStdHandle",
+          "GetStringTypeW",
+          "GetSystemTimeAsFileTime",
+          "GetSystemTimePreciseAsFileTime",
+          "HeapAlloc",
+          "HeapFree",
+          "HeapReAlloc",
+          "HeapSize",
+          "InitializeCriticalSectionEx",
+          "InitializeSListHead",
+          "InterlockedFlushSList",
+          "IsValidCodePage",
+          "LCMapStringW",
+          "LeaveCriticalSection",
+          "LoadLibraryExW",
+          "MultiByteToWideChar",
+          "QueryPerformanceCounter",
+          "RaiseException",
+          "ReleaseSRWLockExclusive",
+          "RtlLookupFunctionEntry",
+          "RtlPcToFileHeader",
+          "RtlUnwindEx",
+          "SetFilePointerEx",
+          "SetLastError",
+          "SetStdHandle",
+          "SleepConditionVariableSRW",
+          "TerminateProcess",
+          "TryAcquireSRWLockExclusive",
+          "VerSetConditionMask",
+          "VerifyVersionInfoW",
+          "VirtualProtect",
+          "VirtualQuery",
+          "WaitForSingleObjectEx",
+          "WakeAllConditionVariable",
+          "WakeConditionVariable",
+          "WideCharToMultiByte",
+          "WriteConsoleW",
+          "WriteFile"
+        ],
+        "api-ms-win-core-synch-l1-2-0.dll": [
+          "WaitOnAddress",
+          "WakeByAddressAll"
+        ]
+      }
+    }
+  ],
+  "verification": {
+    "build_x64_exit": 0,
+    "ctest_x64_passed": 7,
+    "ctest_x64_total": 7,
+    "python_passed": 95,
+    "python_total": 95,
+    "ctest_x86_exit": 8,
+    "ctest_x86_passed": 5,
+    "ctest_x86_total": 7,
+    "ctest_x86_not_run": [
+      "plugin_abi_smoke",
+      "plugin_dll_e2e_tests"
+    ]
+  },
+  "packaged_dll_regressions": {
+    "x64": {
+      "schema": 1,
+      "archive_sha256": "b64fcad825c2c1f00413d20d95be9e41483716cadcd19a1718caa952bf384292",
+      "harness": {
+        "size": 313344,
+        "sha256": "6bac0dbbbd46051009afb88c479459bc34b0563a7a5fc68761df59f1d1bd9531",
+        "machine": "x64",
+        "pe_valid": true
+      },
+      "report": {
+        "schema": 1,
+        "environment": {
+          "os": "Windows",
+          "architecture": "x64",
+          "host_version": "8.9.8.1",
+          "scintilla_version": "5.6.6"
+        },
+        "revision": "6b5dd197d41dd701558eaaf69690dc155b916a6f",
+        "dll": {
+          "size": 244736,
+          "sha256": "adeba51265876f02b19d0ca462090457ae5d99cc504eb7a5d4c63ef3c5307ef0",
+          "machine": "x64",
+          "pe_valid": true
+        },
+        "simulated": {
+          "schema": 1,
+          "suite": "simulated-host",
+          "cases": 103,
+          "failures": 0,
+          "containment_cases": 6,
+          "integrity_loss_cases": 6,
+          "preservation_gate": "failed",
+          "native_gates": "pending",
+          "release_blocked": true,
+          "fault_observations": [
+            {
+              "case": 0,
+              "text_equal": true,
+              "selection_equal": false,
+              "history_equal": true,
+              "replacements": 1,
+              "undo_calls": 0
+            },
+            {
+              "case": 1,
+              "text_equal": false,
+              "selection_equal": false,
+              "history_equal": false,
+              "replacements": 1,
+              "undo_calls": 0
+            },
+            {
+              "case": 2,
+              "text_equal": false,
+              "selection_equal": false,
+              "history_equal": false,
+              "replacements": 1,
+              "undo_calls": 0
+            },
+            {
+              "case": 3,
+              "text_equal": false,
+              "selection_equal": false,
+              "history_equal": false,
+              "replacements": 1,
+              "undo_calls": 0
+            },
+            {
+              "case": 4,
+              "text_equal": true,
+              "selection_equal": false,
+              "history_equal": true,
+              "replacements": 0,
+              "undo_calls": 0
+            },
+            {
+              "case": 5,
+              "text_equal": false,
+              "selection_equal": true,
+              "history_equal": true,
+              "replacements": 0,
+              "undo_calls": 0
+            }
+          ]
+        },
+        "gates": {
+          "native_callbacks": "pending",
+          "native_undo_selection": "pending",
+          "native_failure_preservation": "pending",
+          "native_arm64": "pending",
+          "simulated_containment": "passed",
+          "simulated_preservation": "failed"
+        },
+        "release_blocked": true,
+        "native_certified": false
+      }
+    },
+    "x86": "blocked-missing-harness",
+    "ARM64": "not-executed-cross-only"
+  },
+  "open_release_gates": [
+    "native-ARM64",
+    "ABI-x86",
+    "native-failure-preservation",
+    "native-callback-order",
+    "runtime-privacy-observation",
+    "Compact-p95-4.1"
+  ],
+  "release_blocked": true
+}

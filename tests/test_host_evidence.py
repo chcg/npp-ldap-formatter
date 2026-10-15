@@ -106,6 +106,12 @@ class HostEvidenceTests(unittest.TestCase):
         with patch.object(evidence, "inspect_pe", return_value=self.report["dll"]), patch.object(evidence.subprocess, "run", return_value=SimpleNamespace(stdout=json.dumps(self.report["simulated"]).encode(), stderr=b"", returncode=3)):
             with self.assertRaises(ValueError): evidence.run(Path("harness.exe"), Path("plugin.dll"), "b" * 40)
 
+    def test_runner_rejects_stderr_even_with_valid_stdout(self):
+        with patch.object(evidence, "inspect_pe", return_value=self.report["dll"]), patch.object(evidence.subprocess, "run", return_value=SimpleNamespace(stdout=json.dumps(self.report["simulated"]).encode(), stderr=b"private-marker", returncode=0)):
+            with self.assertRaises(ValueError) as rejected:
+                evidence.run(Path("harness.exe"), Path("plugin.dll"), "b" * 40)
+            self.assertNotIn("private-marker", str(rejected.exception))
+
     def test_runner_success_returns_complete_report(self):
         expected = {"schema": 1, "environment": {"os": "Windows", "architecture": "x64", "host_version": "8.9.8.1", "scintilla_version": "5.6.6"},
                     "revision": "b" * 40, "dll": self.report["dll"], "simulated": self.report["simulated"],
