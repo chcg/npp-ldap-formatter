@@ -51,7 +51,9 @@ Descartar el documento de prueba al cerrar. Registrar sólo resultados de la
 observación, sin datos privados.
 
 La [matriz anterior](package-host-validation-results.json) corresponde a los
-binarios anteriores y se conserva como evidencia histórica. Este arreglo sólo
-se compiló y ejecutó en x64; no promueve x86 ni ARM64. El ticket 4.2 continúa
-`in-progress`, con Ctrl+Z humano y host ARM64 nativo pendientes; los bloqueos ABI
-x86 y rendimiento Compact de 4.1 permanecen documentados.
+binarios anteriores y se conserva como evidencia histórica. Al preparar esta
+copia sólo se había compilado y ejecutado el arreglo en x64. Posteriormente el
+usuario confirmó Ctrl+Z humano y la secuencia Pretty/Compact; la
+[aceptación y certificación estática ARM64 actualizada](package-host-validation.md)
+registra el cierre autorizado de 4.2 y la ejecución nativa ARM64 diferida a CI.
+Los bloqueos ABI x86 y rendimiento Compact de 4.1 permanecen documentados.

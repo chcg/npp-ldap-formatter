@@ -1,14 +1,66 @@
 # Validación de paquetes en hosts aislados (4.2)
 
+## Aceptación HITL y decisión de cierre — 2026-10-14
+
+El usuario confirmó la verificación humana interactiva en Notepad++ real después
+del arreglo `f43e2b6664a2158ae729903fbb6b7e0bb754c531`, sobre el contexto de la copia
+x64 8.9.8.1 preparada para HITL. La normalización de selección funciona y la
+ejecución consecutiva Pretty/Compact no presenta cuadros de error modal:
+
+| Ejercicio humano | Resultado confirmado |
+|---|---|
+| Pretty → Ctrl+Z | Restaura el estado original en exactamente un paso atómico |
+| Pretty → Compact | Transforma correctamente el filtro completo |
+| Pretty → Compact → Ctrl+Z | Restaura el estado Pretty anterior en exactamente un paso atómico |
+
+La confirmación procede del usuario; no se deduce del Undo por API del runner.
+No se registró contenido del documento. DLL x64 verificada: SHA-256
+`fe312554cfffb2f6b1d382b4e16bd48dab5980cd6c3fb14c5510c79ed4bf40ad`.
+
+**Decisión explícita del usuario:** cerrar 4.2 con HITL satisfactorio y diferir
+formalmente la ejecución física ARM64 al futuro runner ARM64 del flujo de CI de
+GitHub Actions. Esta decisión no certifica ejecución ARM64 ni habilita release.
+La evidencia x86 previa sigue siendo WOW64; no se declara nueva aceptación humana
+x86 ni se cierra la limitación ABI de 2.7.
+
+### ARM64: certificación estática y ejecución diferida
+
+Se recompiló ARM64 desde `f43e2b6`, Release con MSVC v143 y runtime estático
+`MultiThreaded` (`/MT`), comprobado en el proyecto generado. Lectura independiente
+del binario: DOS `MZ`, firma `PE`, arquitectura `0xAA64`, PE32+ y flag DLL válidos.
+`link.exe /dump /exports` confirmó los seis exports oficiales: `beNotified`,
+`getFuncsArray`, `getName`, `isUnicode`, `messageProc` y `setInfo`.
+
+| Artefacto ARM64 actualizado | Evidencia |
+|---|---|
+| DLL | 214528 bytes |
+| SHA-256 DLL | `d43293e17ffecda2e4a00a704717cdd0d397b08a38b99d28c4dd6610c9d57523` |
+| SHA-256 ZIP | `ef95812e84436fe6e71f67bf71616b3e1e8d6caafc7593d4305196527cafe9a1` |
+
+Paquete local nuevo: `.build/host-validation-4-2/arm64-static-final/`; checksum
+adyacente y contenido ZIP contrastados con la DLL compilada. Registro estático:
+`static-evidence.json` en ese directorio. No se ejecutó ARM64 de forma nativa ni
+emulada. La compilación cruzada y los exports no prueban inicialización ni Undo.
+
+El workflow actual `.github/workflows/ci.yml` usa `windows-2022` x64 para la matriz;
+su variante ARM64 sólo compila y empaqueta de forma cruzada. Queda diferido
+incorporar/provisionar un runner Windows ARM64 nativo y ejecutar allí el host
+Notepad++ ARM64 8.9.8.1 con el paquete correspondiente, conservando URL/run ID,
+hashes y evidencia de carga, menús, Pretty/Compact y Undo. No hay ejecución remota
+ni runner nativo ya certificado en esta evidencia. Los demás gates de release,
+privacidad y rendimiento Compact de 4.1 conservan su estado independiente.
+
+## Procedimiento y evidencia histórica de preparación
+
 Para repetir HITL x64 tras el incidente Pretty → Compact, usar la
 [DLL y copia portátil corregidas](package-host-selection-fix.md). La matriz
 de esta guía se conserva como evidencia de los binarios anteriores.
 
-La evidencia usa ZIP de distribución y Notepad++ oficial 8.9.8.1 de la misma
+La evidencia inicial usa ZIP de distribución y Notepad++ oficial 8.9.8.1 de la misma
 arquitectura. El smoke comprueba módulo cargado, ruta física, dos comandos reales,
 salidas básicas literales y Undo por API. La aceptación visual de Ctrl+Z sigue
-pendiente hasta que una persona realice los ejercicios. La historia permanece
-`in-progress` y el release continúa bloqueado.
+pendiente en los reportes automáticos históricos. La aceptación posterior y la
+decisión de cierre están registradas arriba; el release continúa bloqueado.
 
 ## Preparación reproducible
 
