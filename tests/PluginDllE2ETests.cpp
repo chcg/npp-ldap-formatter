@@ -39,7 +39,7 @@ public:
                 if (!VirtualQuery(base + offset, &region, sizeof(region)) || region.AllocationBase != module || region.State != MEM_COMMIT
                     || (region.Protect & (PAGE_NOACCESS | PAGE_GUARD))) { return false; }
                 const auto available{region.RegionSize - static_cast<std::size_t>(base + offset - static_cast<unsigned char*>(region.BaseAddress))};
-                const auto portion{std::min(count, available)}; if (!portion) { return false; } offset += portion; count -= portion;
+                const auto portion{std::min<std::size_t>(count, available)}; if (!portion) { return false; } offset += portion; count -= portion;
             }
             return true;
         };
@@ -111,7 +111,7 @@ int wmain(int argc, wchar_t* argv[]) {
         const auto functions{reinterpret_cast<PFUNCGETFUNCSARRAY>(GetProcAddress(module.get(), "getFuncsArray"))};
         { Session initial{host, info, notify}; }
         int count{}; auto* commands{functions(&count)};
-        if (!commands || count != 3 || !commands[0]._pFunc || !commands[1]._pFunc || std::wcscmp(commands[0]._itemName, L"Pretty") || std::wcscmp(commands[1]._itemName, L"Compact")) { throw std::runtime_error{"DLL commands"}; }
+        if (!commands || count != 3 || !commands[0]._pFunc || !commands[1]._pFunc || std::wcscmp(commands[0]._itemName, L"Format LDAP (Pretty)") || std::wcscmp(commands[1]._itemName, L"Format LDAP (Compact)")) { throw std::runtime_error{"DLL commands"}; }
         int failures{}; std::size_t cases{}, containment{};
         const auto check = [&](bool passed, std::source_location location = std::source_location::current()) {
             if (!passed) { ++failures; std::cerr << "E2E assertion line " << location.line() << '\n'; }

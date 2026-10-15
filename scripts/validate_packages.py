@@ -12,18 +12,32 @@ else:
     from package_plugin import DLL_NAME, MACHINES, project_version, validate_dll
 
 
-def validate_package(archive: Path, arch: str, dll: Path | None = None) -> str:
-    data = archive.read_bytes()
-    checksum = archive.with_suffix('.zip.sha256').read_text(encoding='utf-8').strip()
+MAX_ARCHIVE_BYTES = 20 * 1024**2
+MAX_DLL_BYTES = 8 * 1024**2
+
+
+def validate_package_data(data: bytes, checksum: str, name: str, arch: str) -> tuple[str, bytes]:
+    if not 1 <= len(data) <= MAX_ARCHIVE_BYTES:
+        raise ValueError('ZIP fuera de limites')
+    checksum = checksum.strip()
     match = re.fullmatch(r'([0-9a-f]{64})  (.+)', checksum)
     digest = hashlib.sha256(data).hexdigest()
-    if match is None or match.group(1) != digest or match.group(2) != archive.name:
+    if match is None or match.group(1) != digest or match.group(2) != name:
         raise ValueError('Checksum SHA-256 o nombre de ZIP incorrecto')
     with zipfile.ZipFile(io.BytesIO(data)) as zipped:
         if zipped.namelist() != [DLL_NAME]:
             raise ValueError('El ZIP debe contener solamente la DLL en raiz')
+        if not 64 <= zipped.getinfo(DLL_NAME).file_size <= MAX_DLL_BYTES:
+            raise ValueError('DLL empaquetada fuera de limites')
         content = zipped.read(DLL_NAME)
     validate_dll(content, arch)
+    return digest, content
+
+
+def validate_package(archive: Path, arch: str, dll: Path | None = None) -> str:
+    with archive.open('rb') as stream:
+        data = stream.read(MAX_ARCHIVE_BYTES + 1)
+    digest, content = validate_package_data(data, archive.with_suffix('.zip.sha256').read_text(encoding='utf-8'), archive.name, arch)
     if dll is not None and content != dll.read_bytes():
         raise ValueError('La DLL empaquetada no coincide con el build')
     return digest

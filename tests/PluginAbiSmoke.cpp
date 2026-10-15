@@ -61,8 +61,8 @@ int wmain(int argc, wchar_t* argv[]) {
         return 4;
     }
     notify(nullptr);
-    if (std::wcscmp(items[0]._itemName, L"Pretty") != 0
-        || std::wcscmp(items[1]._itemName, L"Compact") != 0
+    if (std::wcscmp(items[0]._itemName, L"Format LDAP (Pretty)") != 0
+        || std::wcscmp(items[1]._itemName, L"Format LDAP (Compact)") != 0
         || items[1]._pFunc == nullptr) { return 6; }
     items[0]._pFunc();
     items[1]._pFunc();

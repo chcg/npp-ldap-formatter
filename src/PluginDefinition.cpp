@@ -46,8 +46,8 @@ bool setCommand(int index, std::wstring_view name, PFUNCPLUGINCMD callback,
 }
 
 void commandMenuInit() noexcept {
-    (void)setCommand(0, L"Pretty", pretty);
-    (void)setCommand(1, L"Compact", compact);
+    (void)setCommand(0, L"Format LDAP (Pretty)", pretty);
+    (void)setCommand(1, L"Format LDAP (Compact)", compact);
     (void)setCommand(2, L"Acerca de LDAP Formatter", about);
 }
 void pluginInit(NppData data) noexcept { controller.setPresenter(presentDiagnostic); controller.initialize(data); }

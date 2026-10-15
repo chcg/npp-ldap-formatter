@@ -17,7 +17,7 @@ bool readableNotification(const SCNotification* notification) noexcept {
                 | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) { return false; }
         const auto base{reinterpret_cast<std::uintptr_t>(region.BaseAddress)};
         if (region.RegionSize > std::numeric_limits<std::uintptr_t>::max() - base || base + region.RegionSize <= address) { return false; }
-        address = std::min(end, base + region.RegionSize);
+        address = std::min<std::uintptr_t>(end, base + region.RegionSize);
     }
     return true;
 }
