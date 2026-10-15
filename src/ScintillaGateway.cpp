@@ -99,7 +99,7 @@ CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBud
         const auto amount{selected ? before.end - before.begin : before.length};
         if (static_cast<uptr_t>(amount) > MaxInputBytes) { return fail(CaptureErrorCode::Length, MaxInputBytes); }
         const auto size{static_cast<std::size_t>(amount)};
-        if (selected && query(SCI_GETSELTEXT) != static_cast<sptr_t>(size + 1)) { return fail(CaptureErrorCode::Api); }
+        if (selected && query(SCI_GETSELTEXT) != static_cast<sptr_t>(size)) { return fail(CaptureErrorCode::Api); }
         if (!budget) { budget = std::make_shared<CoreBudget>(); }
         auto reservation{budget->reserve(size + 1 + sizeof(ScintillaSnapshot))};
         if (!reservation) { return fail(CaptureErrorCode::Resources); }
@@ -107,7 +107,7 @@ CaptureResult ScintillaGateway::capture(OutputMode mode, std::shared_ptr<CoreBud
         const auto count{selected
             ? query(SCI_GETSELTEXT, 0, reinterpret_cast<sptr_t>(snapshot.bytes.data()))
             : query(SCI_GETTEXT, static_cast<uptr_t>(size + 1), reinterpret_cast<sptr_t>(snapshot.bytes.data()))};
-        if (count != static_cast<sptr_t>(selected ? size + 1 : size) || snapshot.bytes[size] != '\0') { return fail(CaptureErrorCode::Api); }
+        if (count != static_cast<sptr_t>(size) || snapshot.bytes[size] != '\0') { return fail(CaptureErrorCode::Api); }
         const auto after{read()};
         if (query(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::Api); }
         if (activeView() != view || before != after) { return fail(CaptureErrorCode::DocumentChanged); }

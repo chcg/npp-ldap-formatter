@@ -32,7 +32,7 @@ struct State {
     int active{}, codepage{SC_CP_UTF8}, eol{SC_EOL_CRLF}, selections{1}, selectionMode{SC_SEL_STREAM};
     bool readonly{}, undo{true}, virtualSpace{}, badCount{}, badNul{}, changed{}, statusFailure{}, changeOnRead{};
     int changeIdentity{};
-    bool copied{};
+    bool copied{}, badCopyCount{};
     std::size_t copies{};
     std::optional<Sci_Position> lengthOverride{}, beginOverride{}, endOverride{};
     bool nullDocument{}, nullBuffer{}, wrongTextCapacity{};
@@ -208,7 +208,7 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
             state.copied = true;
             ++state.copies;
         }
-        return static_cast<LRESULT>(count + (message == SCI_GETSELTEXT ? 1 : 0)) + (state.badCount ? 1 : 0);
+        return static_cast<LRESULT>(count) + (state.badCount || (l && state.badCopyCount) ? 1 : 0);
     }
     default: ++state.mutations; return 0;
     }
@@ -306,10 +306,14 @@ int main() {
         check(result.ok() && result.snapshot->metadata.eol == eol && result.snapshot->text() == state.text);
     }
     state.badCount = true; rejected(ldap::CaptureErrorCode::Api); state.badCount = false;
+    state.copied = false; state.badCopyCount = true; rejected(ldap::CaptureErrorCode::Api);
+    check(state.copied); state.badCopyCount = false;
     state.badNul = true; rejected(ldap::CaptureErrorCode::Api); state.badNul = false;
     state.anchor = 0; state.caret = 1;
     { auto result{gateway.capture(ldap::OutputMode::Pretty, budget)}; check(result.ok() && result.snapshot->text() == "a"); }
     state.badCount = true; rejected(ldap::CaptureErrorCode::Api); state.badCount = false;
+    state.copied = false; state.badCopyCount = true; rejected(ldap::CaptureErrorCode::Api);
+    check(state.copied); state.badCopyCount = false;
     state.badNul = true; rejected(ldap::CaptureErrorCode::Api); state.badNul = false;
     state.anchor = state.caret = 0;
     state.statusFailure = true; rejected(ldap::CaptureErrorCode::Api); state.statusFailure = false;
@@ -428,6 +432,48 @@ int main() {
           check(state.anchor == (direction == 1 ? outputEnd : begin) && state.caret == (direction == 1 ? begin : outputEnd));
         }
       }
+    }
+    // Do not reset selection between commands: each capture must include the complete output.
+    for (int scope{}; scope != 4; ++scope) {
+      state.text = scope < 2 ? "( & (cn=Jos\xc3\xa9) (sn=b) )" : "pre ( & (cn=Jos\xc3\xa9) (sn=b) ) post";
+      const auto begin{scope < 2 ? Sci_Position{} : Sci_Position{4}};
+      const auto end{static_cast<Sci_Position>(state.text.size()) - (scope < 2 ? 0 : 5)};
+      state.anchor = scope == 3 ? end : begin;
+      state.caret = scope == 0 ? begin : scope == 3 ? begin : end;
+      const auto prefix{state.text.substr(0, static_cast<std::size_t>(begin))};
+      const auto suffix{state.text.substr(static_cast<std::size_t>(end))};
+      const std::string compact{"(&(cn=Jos\xc3\xa9)(sn=b))"};
+      const std::string pretty{"(&\r\n  (cn=Jos\xc3\xa9)\r\n  (sn=b)\r\n)"};
+      for (int step{}; step != 4; ++step) {
+        const auto mode{step < 2 ? ldap::OutputMode::Pretty : ldap::OutputMode::Compact};
+        auto captured{gateway.capture(mode, budget)};
+        check(captured.ok());
+        if (!captured.ok()) { break; }
+        if (step != 0) { check(captured.snapshot->text() == (step < 3 ? pretty : compact)); }
+        ldap::FormatOptions options{}; options.mode = mode;
+        auto formatted{ldap::formatFilter(captured.snapshot->text(), options)};
+        check(formatted.ok());
+        if (!formatted.ok()) { break; }
+        const auto replacements{state.replacements}, begins{state.begins}, ends{state.ends};
+        const auto result{gateway.commit(*captured.snapshot, formatted.text, budget)};
+        const auto& expected{step < 2 ? pretty : compact};
+        const auto postEnd{begin + static_cast<Sci_Position>(expected.size())};
+        const bool changed{step == 0 || step == 2};
+        check(result.ok() && result.applied == changed && state.text == prefix + expected + suffix
+          && state.replacements == replacements + (changed ? 1 : 0)
+          && state.begins == begins + (changed ? 1 : 0) && state.ends == ends + (changed ? 1 : 0)
+          && state.anchor == (scope == 3 ? postEnd : begin) && state.caret == (scope == 3 ? begin : postEnd));
+      }
+    }
+    { state.text = "(&(cn=a)(sn=b))"; state.anchor = 2; state.caret = 7;
+      const auto originalText{state.text}; const auto replacements{state.replacements};
+      auto captured{gateway.capture(ldap::OutputMode::Compact, budget)};
+      check(captured.ok());
+      if (captured.ok()) {
+        const auto formatted{ldap::formatFilter(captured.snapshot->text())};
+        check(!formatted.ok() && formatted.error->code == ldap::LdapErrorCode::UnbalancedParenthesis);
+      }
+      check(state.text == originalText && state.anchor == 2 && state.caret == 7 && state.replacements == replacements);
     }
     state.active = 0;
     const auto resetCommit = [&] { state.text = "( & (cn=a) (sn=b) )"; state.anchor = state.caret = 3; };

@@ -1,5 +1,9 @@
 # Validación de paquetes en hosts aislados (4.2)
 
+Para repetir HITL x64 tras el incidente Pretty → Compact, usar la
+[DLL y copia portátil corregidas](package-host-selection-fix.md). La matriz
+de esta guía se conserva como evidencia de los binarios anteriores.
+
 La evidencia usa ZIP de distribución y Notepad++ oficial 8.9.8.1 de la misma
 arquitectura. El smoke comprueba módulo cargado, ruta física, dos comandos reales,
 salidas básicas literales y Undo por API. La aceptación visual de Ctrl+Z sigue

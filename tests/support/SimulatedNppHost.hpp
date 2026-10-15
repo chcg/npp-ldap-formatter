@@ -135,7 +135,7 @@ private:
             const auto count{message == SCI_GETTEXT ? std::min(length, w ? static_cast<std::size_t>(w - 1) : 0) : length};
             if (l) { auto* output{reinterpret_cast<char*>(l)}; std::memcpy(output, d.image.bytes.data() + begin, count);
                 output[count] = d.badNul ? 'x' : '\0'; ++d.reads; callback(d.onRead); }
-            return static_cast<LRESULT>(count + (message == SCI_GETSELTEXT ? 1 : 0)) + (d.badCount ? 1 : 0);
+            return static_cast<LRESULT>(count) + (d.badCount ? 1 : 0);
         }
         case SCI_BEGINUNDOACTION: ++d.begins; d.group = true; d.recorded = false; d.groupBefore = d.image; d.token = 0; callback(d.onBegin); return 0;
         case SCI_ADDUNDOACTION: d.token = static_cast<int>(w); if (d.tokenFailure) { d.status = SC_STATUS_FAILURE; } callback(d.onToken); return 0;
