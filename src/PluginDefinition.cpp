@@ -23,7 +23,7 @@ void about() {
     const auto version{ldap::buildVersion()};
     if (!version.empty()) {
         MessageBoxW(controller.host()._nppHandle,
-            L"LDAP Formatter 0.1.0",
+            L"LDAP Formatter 1.0.0",
             NPP_PLUGIN_NAME, MB_OK | MB_ICONINFORMATION);
     }
 }
