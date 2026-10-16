@@ -93,7 +93,7 @@ def cli_case(arch="x64"):
         root = Path(temporary).resolve()
         dll = root / DLL_NAME
         dll.write_bytes(fake_dll(MACHINES[arch]))
-        archive = package(dll, root / "packages", arch, "0.1.0")
+        archive = package(dll, root / "packages", arch, host.PLUGIN_VERSION)
         host_zip = root / "host.zip"
         with zipfile.ZipFile(host_zip, "w") as zipped:
             zipped.writestr("notepad++.exe", fake_dll(MACHINES[arch], 2))
@@ -555,7 +555,7 @@ class HostPackageTests(unittest.TestCase):
             root = Path(temporary)
             dll = root / DLL_NAME
             dll.write_bytes(fake_dll(MACHINES["x64"]))
-            archive = package(dll, root / "packages", "x64", "0.1.0")
+            archive = package(dll, root / "packages", "x64", host.PLUGIN_VERSION)
             host_zip = root / "host.zip"
             with zipfile.ZipFile(host_zip, "w") as zipped:
                 zipped.writestr("notepad++.exe", fake_dll(MACHINES["x64"], 2))
