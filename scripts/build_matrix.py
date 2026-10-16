@@ -36,7 +36,7 @@ def main() -> None:
     args = parser.parse_args()
     if os.name != 'nt':
         parser.error('El baseline requiere Windows y MSVC v143')
-    cmake = [args.cmake] if args.cmake else ['uvx', '--from', 'cmake==3.31.6', 'cmake']
+    cmake = [args.cmake] if args.cmake else ['uvx', '--cache-dir', str(ROOT / '.uv-cache'), '--from', 'cmake==3.31.6', 'cmake']
     run_matrix(list(PRESETS) if args.arch == 'all' else [args.arch], cmake, args.test)
 
 

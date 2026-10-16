@@ -25,6 +25,7 @@ Rutas requeridas: PowerEditor/src/MISC/PluginsManager y scintilla/include.
 CMake verifica commit, ausencia de cambios locales, versión de Scintilla, headers y macros. El checkout debe conservar .git para comprobar la identidad de origen.
 La instalación de Visual Studio/MSVC y SDK es prerrequisito de los presets nativos.
 
+En CMD, ejecutar primero `set UV_CACHE_DIR=.uv-cache` para mantener también la caché de `uvx` en el workspace.
 Comandos de manifiesto: uvx --from cmake==3.31.6 --with ninja==1.11.1.3 cmake --preset manifest-check.
 Comandos nativos una vez instaladas las herramientas: cmake --preset win32 / x64 / arm64, y cmake --build --preset win32-release / x64-release / arm64-release.
 Si CMake no está en PATH, sustituir `cmake` por `uvx --from cmake==3.31.6 --with ninja==1.11.1.3 cmake`. Los presets Visual Studio descubren el toolchain instalado; para inicializar CMD explícitamente, invocar `vcvars64.bat` de la instancia 2022 con `10.0.26100.0 -vcvars_ver=14.44` y ejecutar configure/build en la misma sesión.

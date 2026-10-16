@@ -12,13 +12,18 @@ La inclusión de archivos bajo `.build` en upload-artifact es explícita y limit
 
 ## Validación local desde CMD
 
+El ZIP conserva `NppLdapFormatter.dll` directamente en su raíz, conforme a las
+[reglas oficiales de Plugins Admin](https://github.com/notepad-plus-plus/npp-usermanual/blob/master/content/docs/plugins.md#rules-for-adding-your-plugins-into-list).
+El checksum SHA-256 corresponde al ZIP completo. Los validadores rechazan DLL
+anidada, miembros adicionales, arquitectura incorrecta y checksum alterado.
+
 ```bat
-uv run python -m unittest discover -s tests -p test_*.py -v
-uv run python scripts/build_matrix.py
-uv run python scripts/build_matrix.py --arch x64 --test
-uv run python scripts/package_plugin.py --arch x64 --dll .build/x64/Release/NppLdapFormatter.dll --output-dir .build/packages/x64
-uv run python scripts/validate_packages.py --arch x64 --packages-dir .build/packages/x64 --dll .build/x64/Release/NppLdapFormatter.dll
-uv run python scripts/validate_packages.py --packages-dir .build/ci-verification
+uv --cache-dir .uv-cache run python -m unittest discover -s tests -p test_*.py -v
+uv --cache-dir .uv-cache run python scripts/build_matrix.py
+uv --cache-dir .uv-cache run python scripts/build_matrix.py --arch x64 --test
+uv --cache-dir .uv-cache run python scripts/package_plugin.py --arch x64 --dll .build/x64/Release/NppLdapFormatter.dll --output-dir .build/packages/x64
+uv --cache-dir .uv-cache run python scripts/validate_packages.py --arch x64 --packages-dir .build/packages/x64 --dll .build/x64/Release/NppLdapFormatter.dll
+uv --cache-dir .uv-cache run python scripts/validate_packages.py --packages-dir .build/ci-verification
 ```
 
 Para repetir el empaquetado, usar un directorio de salida nuevo. Compilar los presets win32/arm64 antes de empaquetar esas arquitecturas. Un build local y el lint del workflow no demuestran una ejecución de GitHub Actions: esa evidencia requerirá publicar el proyecto y conservar URL/run ID y artefactos remotos.

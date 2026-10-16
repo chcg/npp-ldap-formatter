@@ -37,6 +37,29 @@ título, flags y diagnóstico y devuelve IDOK sin modal. No hay exportaciones ni
 hooks de pruebas añadidos al producto. Si el import no existe o la instrumentación
 no es viable, la suite falla explícitamente.
 
+## Comportamiento actual y alcance de la aceptación
+
+El formateador admite SP, HTAB, CR y LF después de `(` y entre el atributo y
+los operadores simples `=`, `~=`, `>=` y `<=`. En el valor solo recorta el
+whitespace periférico cuando el tramo inicial de whitespace contiene CR o LF.
+Conserva los espacios de borde de valores de una sola línea, el whitespace
+interno y los escapes. Una aserción simple de raíz con layout multilinea se
+emite en una línea en Pretty y Compact. Esto no amplía la gramática de
+aserciones extensibles ni del parser legado de igualdad simple.
+
+Release presenta explicaciones y sugerencias sin nombres de enums ni offsets;
+Debug conserva el diagnóstico técnico. Los códigos y offsets UTF-8 internos
+siguen disponibles en ambas configuraciones; no se registran documentos.
+
+La aprobación HITL comunicada por el usuario para `054dec0` cubre el caso
+multilinea sin modal, Compact continuo y un Ctrl+Z atómico con selección/caret
+conservados; véase [la evidencia 4.4](host-gates-evidence-4.4.md).
+No sustituye la matriz nativa de callbacks, Undo/Redo e inyección de fallos.
+La ABI/E2E x86 sigue sin acreditar por ejecutables ausentes, ARM64 requiere
+runner nativo y siguen pendientes la ejecución GitHub y completar los gates
+de rendimiento y privacidad. Las mediciones históricas siguientes conservan
+su alcance y no certifican una release actual.
+
 ## Ejecución reproducible
 
 Usar CMD nativo desde la raíz. El checkout SDK debe corresponder al commit de
@@ -117,7 +140,7 @@ bloqueado. Incluso un fallo temprano puede conservar bytes y perder selección.
 ## Protocolo nativo pendiente
 
 Un CTest verde certifica solo el proceso sintético. El host fijado es Notepad++
-8.9.8.1 con Scintilla 5.6.6. Hasta disponer de ese ejecutable y evidencia verificable,
+8.9.8.1 con Scintilla 5.6.6. Hasta completar la matriz y su evidencia verificable,
 `native_callbacks`, `native_undo_selection`, `native_failure_preservation` y
 `native_arm64` permanecen `pending`. La épica no puede declararse íntegramente
 cerrada ni autorizar release mientras estas puertas estén pendientes o fallidas.

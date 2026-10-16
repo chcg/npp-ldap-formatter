@@ -7,13 +7,18 @@ import unittest
 import zipfile
 from unittest.mock import patch
 
-from scripts.build_matrix import run_matrix
+from scripts.build_matrix import ROOT, main, run_matrix
 from scripts.package_plugin import DLL_NAME, MACHINES, package, project_version
 from scripts.validate_packages import validate_package
 from test_package_plugin import fake_dll
 
 
 class PlatformScriptsTests(unittest.TestCase):
+    def test_default_tool_cache_is_repository_local(self):
+        with patch.object(sys, 'argv', ['build_matrix.py', '--arch', 'x64', '--test']), patch('scripts.build_matrix.run_matrix') as run:
+            main()
+        run.assert_called_once_with(['x64'], ['uvx', '--cache-dir', str(ROOT / '.uv-cache'), '--from', 'cmake==3.31.6', 'cmake'], True)
+
     def test_matrix_matches_ci_flags_and_presets(self):
         with patch('scripts.build_matrix.subprocess.run') as run:
             run_matrix(['x86', 'x64', 'ARM64'], ['cmake'], tests=False)
@@ -56,7 +61,7 @@ class PlatformScriptsTests(unittest.TestCase):
                 validate_package(archive, 'x64')
 
     def test_uvx_prefix_and_explicit_cmake_path_with_x86_tests(self):
-        for command in (['uvx', '--from', 'cmake==3.31.6', 'cmake'], ['C:/Tools/bin/cmake.exe']):
+        for command in (['uvx', '--cache-dir', str(ROOT / '.uv-cache'), '--from', 'cmake==3.31.6', 'cmake'], ['C:/Tools/bin/cmake.exe']):
             with self.subTest(command=command), patch('scripts.build_matrix.subprocess.run') as run:
                 run_matrix(['x86'], command, tests=True)
                 ctest = run.call_args_list[-1].args[0]
