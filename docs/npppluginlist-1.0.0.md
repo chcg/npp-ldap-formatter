@@ -4,11 +4,18 @@ Paquetes locales compilados el 2026-10-16 desde las mismas fuentes, Release,
 MSVC v143, CRT estático y SDK fijado. No constituyen una release publicada ni
 sustituyen los gates pendientes del [dossier](release-dossier-4.6.md).
 
-| Arquitectura | ZIP bajo `.build/release-1.0.0/` | Bytes | SHA-256 del ZIP completo |
+| Arquitectura | ZIP bajo `.build/release-1.0.0-upload/` | Bytes | SHA-256 del ZIP completo |
 | --- | --- | ---: | --- |
-| x64 | `x64/NppLdapFormatter-1.0.0-x64.zip` | 124732 | `59aba8486e18f646b9edfe91aa2a902be77466b00077cfb330ab38c2b68cbc27` |
-| x86 | `x86/NppLdapFormatter-1.0.0-x86.zip` | 102617 | `fae55227ebc30f96e8e4c10df0e288e0f36211f2f0a111147d2e1df46aaee858` |
-| ARM64 | `ARM64/NppLdapFormatter-1.0.0-ARM64.zip` | 102328 | `5ee4db6d3912fc592756f27c46f43a14cea3d885b41c2113fe92835da786c361` |
+| x64 | `NppLdapFormatter_x64.zip` | 124732 | `59aba8486e18f646b9edfe91aa2a902be77466b00077cfb330ab38c2b68cbc27` |
+| x86 | `NppLdapFormatter_x86.zip` | 102617 | `fae55227ebc30f96e8e4c10df0e288e0f36211f2f0a111147d2e1df46aaee858` |
+| ARM64 | `NppLdapFormatter_arm64.zip` | 102328 | `5ee4db6d3912fc592756f27c46f43a14cea3d885b41c2113fe92835da786c361` |
+
+Se volvió a ejecutar `scripts/package_plugin.py` para las tres arquitecturas,
+con salida nueva en `staging/` bajo ese directorio. Los nombres finales son copias
+byte a byte de esos ZIP validados; no se recomprimieron ni se renombró la DLL.
+Los hashes permanecen iguales porque los bytes del ZIP no cambiaron. Cada ZIP
+tiene un `.zip.sha256` que referencia su nombre final; `SHA256SUMS.txt` reúne
+los tres checksums para el upload.
 
 Cada ZIP se reabrió y contiene únicamente `NppLdapFormatter.dll` en su raíz,
 idéntica al build correspondiente. Se comprobaron el encabezado PE, la máquina,
@@ -23,10 +30,11 @@ Ignacio Javier Julio Posada y los hashes de esta tabla. La versión mínima
 anunciada es Notepad++ `8.9.8.1`, baseline verificado por el proyecto.
 
 La homepage es `https://github.com/ignaciojulio/npp-ldap-formatter`; los enlaces
-de descarga preparados siguen este patrón, respetando `ARM64` en mayúsculas:
+de descarga preparados usan exactamente los nombres de la tabla, con los
+identificadores `x64`, `x86` y `arm64` en minúsculas:
 
 ```text
-https://github.com/ignaciojulio/npp-ldap-formatter/releases/download/v1.0.0/NppLdapFormatter-1.0.0-<arquitectura>.zip
+https://github.com/ignaciojulio/npp-ldap-formatter/releases/download/v1.0.0/NppLdapFormatter_<arquitectura>.zip
 ```
 
 ## Verificación y límites
@@ -35,7 +43,8 @@ https://github.com/ignaciojulio/npp-ldap-formatter/releases/download/v1.0.0/NppL
   nombre y URL, orden por `display-name` sin distinguir mayúsculas, y lectura
   UTF-8 estricta. Las entradas previas conservan sus valores; se reubicaron
   `NppTranslator` y, en x64, `SimplifyJson`, que estaban fuera de orden.
-- CTest x64: 7/7. CTest x86: 5/7; ABI y E2E quedan **Not Run** porque los dos
+- Evidencia de los builds originales, sin cambios nativos en esta preparación:
+  CTest x64: 7/7. CTest x86: 5/7; ABI y E2E quedan **Not Run** porque los dos
   EXE no aparecen después de MSBuild. La causa no se ha atribuido. Es el bloqueo
   ya documentado en el dossier. ARM64: compilación cruzada y validación estática;
   ejecución nativa pendiente.
@@ -43,6 +52,7 @@ https://github.com/ignaciojulio/npp-ldap-formatter/releases/download/v1.0.0/NppL
   confirmar que sus restricciones impedían escribir las DLL temporales de prueba.
 - No se publicó `v1.0.0`, no se subieron los ZIP ni se hizo push. Los enlaces
   requieren publicar estos bytes exactos para que la descarga y el hash del
-  validador en línea funcionen. Reempaquetar cambia el hash aunque la DLL no cambie.
+  validador en línea funcionen. Cambiar los bytes o los metadatos internos del ZIP
+  puede cambiar el hash aunque la DLL no cambie.
 - No se ejecutó el validador global del fork, que descarga todas las entradas;
   se verificaron localmente esquema, recursos y paquetes de LDAP Formatter.
