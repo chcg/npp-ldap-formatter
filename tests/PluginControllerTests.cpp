@@ -131,10 +131,22 @@ int main() {
             && state.anchor == anchorBefore && state.caret == caretBefore && state.selectionSets == sets && state.replacements == edits && state.addedTokens == tokens);
         check(lastDiagnostic.error.code == controller.error()->code && lastDiagnostic.error.offset == controller.error()->offset);
         if (rejection == 0) {
-            check(lastDiagnostic.error.offset == 4 && lastDiagnostic.error.position == ldap::ErrorPosition::Input
-                && std::wcsstr(lastDiagnostic.text.data(), L"byte documental 14") && std::wcsstr(lastDiagnostic.text.data(), L"selección capturada"));
+            check(lastDiagnostic.error.offset == 4 && lastDiagnostic.error.position == ldap::ErrorPosition::Input);
+#ifndef NDEBUG
+            check(std::wcsstr(lastDiagnostic.text.data(), L"byte documental 14") && std::wcsstr(lastDiagnostic.text.data(), L"selección capturada"));
+#else
+            check(std::wcsstr(lastDiagnostic.text.data(), L"paréntesis incompletos") && std::wcsstr(lastDiagnostic.text.data(), L"Revisa"));
+#endif
         }
-        if (rejection >= 4) { check(lastDiagnostic.error.position == ldap::ErrorPosition::Unavailable && std::wcsstr(lastDiagnostic.text.data(), L"Posición no disponible")); }
+        if (rejection >= 4) {
+            check(lastDiagnostic.error.position == ldap::ErrorPosition::Unavailable);
+#ifndef NDEBUG
+            check(std::wcsstr(lastDiagnostic.text.data(), L"Posición no disponible"));
+#else
+            const auto* suggestion{rejection <= 6 ? L"Usa una sola selección" : rejection == 7 ? L"Convierte su codificación" : L"Vuelve a seleccionar"};
+            check(std::wcsstr(lastDiagnostic.text.data(), suggestion) && !std::wcsstr(lastDiagnostic.text.data(), L"Posición"));
+#endif
+        }
         state.readonly = false; state.undo = true; state.selections = 1; state.codepage = SC_CP_UTF8; state.badCount = false;
     }
     // A new successful request suppresses an older queued capture diagnostic.
@@ -193,10 +205,16 @@ int main() {
     const auto outputError{ldap::formatFilter(state.text)};
     check(outputError.error && outputError.error->code == ldap::LdapErrorCode::OutputTooLarge);
     preservedRejection(ldap::OutputMode::Pretty, ldap::CaptureErrorCode::Core, ldap::LdapErrorCode::OutputTooLarge, outputError.error->offset);
-    check(lastDiagnostic.error.position == ldap::ErrorPosition::Output && std::wcsstr(lastDiagnostic.text.data(), L"posición de entrada no disponible"));
+    check(lastDiagnostic.error.position == ldap::ErrorPosition::Output);
+#ifndef NDEBUG
+    check(std::wcsstr(lastDiagnostic.text.data(), L"posición de entrada no disponible"));
     std::array<wchar_t, 96> outputByte{};
     (void)swprintf_s(outputByte.data(), outputByte.size(), L"Byte de salida %zu (desde cero, documento capturado)", outputError.error->offset);
     check(std::wcsstr(lastDiagnostic.text.data(), outputByte.data()) && !std::wcsstr(lastDiagnostic.text.data(), L"Byte de entrada"));
+#else
+    check(std::wcsstr(lastDiagnostic.text.data(), L"resultado del formateo sería demasiado grande")
+        && std::wcsstr(lastDiagnostic.text.data(), L"Selecciona un filtro más pequeño"));
+#endif
     state.text = "(cn=synthetic-sensitive-DN-credential-marker";
     const auto sensitiveError{ldap::formatFilter(state.text)};
     preservedRejection(ldap::OutputMode::Compact, ldap::CaptureErrorCode::Core, sensitiveError.error->code, state.text.size());
@@ -333,7 +351,12 @@ int main() {
     check(controller.hostGateFailed() && presentation.count == gateNotices + 1 && controller.error()->core && syntaxError->core
         && controller.error()->core->code == syntaxError->core->code && controller.error()->offset == syntaxError->offset
         && lastDiagnostic.error.code == ldap::CaptureErrorCode::UnsupportedState && lastDiagnostic.error.hostBlocked
-        && !lastDiagnostic.error.core && std::wcsstr(lastDiagnostic.text.data(), L"bloqueado hasta reinicialización"));
+        && !lastDiagnostic.error.core);
+#ifndef NDEBUG
+    check(std::wcsstr(lastDiagnostic.text.data(), L"bloqueado hasta reinicialización"));
+#else
+    check(std::wcsstr(lastDiagnostic.text.data(), L"Revisa el documento y reinicia Notepad++"));
+#endif
     resetRegression();
     // observeHistory's identity query can supersede an already failed delivery.
     state.text = "(cn="; state.anchor = state.caret = 0;
@@ -526,9 +549,14 @@ int main() {
             controller.submit(ldap::OutputMode::Compact); check(finish(controller)); drainMessages();
             if (failure < 3) {
                 check(presentation.count == notices + 1 && lastDiagnostic.error.code == ldap::CaptureErrorCode::CommitIndeterminate
-                    && lastDiagnostic.error.position == ldap::ErrorPosition::Unavailable
-                    && std::wcsstr(lastDiagnostic.text.data(), L"Resultado no confirmable")
+                    && lastDiagnostic.error.position == ldap::ErrorPosition::Unavailable);
+#ifndef NDEBUG
+                check(std::wcsstr(lastDiagnostic.text.data(), L"Resultado no confirmable")
                     && std::wcsstr(lastDiagnostic.text.data(), L"bloqueado hasta reinicialización"));
+#else
+                check(std::wcsstr(lastDiagnostic.text.data(), L"No se pudo confirmar el resultado")
+                    && std::wcsstr(lastDiagnostic.text.data(), L"reinicia Notepad++"));
+#endif
             }
         }
         state.replaceFailure = state.postFailure = false;

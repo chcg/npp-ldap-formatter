@@ -221,6 +221,56 @@ struct Window {
     ~Window() { if (handle) { DestroyWindow(handle); } }
 };
 }
+int diagnosticTests() {
+    int failures{};
+    const auto check = [&](bool passed) { if (!passed) { ++failures; std::cerr << "Case failed\n"; } };
+    const auto checkDiagnostic = [&](const ldap::CaptureError& error) {
+        const auto visible{ldap::describeError(error)};
+        check(visible.error.code == error.code && visible.error.offset == error.offset
+            && visible.error.scope == error.scope && visible.error.position == error.position
+            && visible.error.hostBlocked == error.hostBlocked && visible.error.core.has_value() == error.core.has_value());
+        if (error.core) { check(visible.error.core->code == error.core->code && visible.error.core->offset == error.core->offset); }
+        check(visible.text[0] != L'\0');
+#ifndef NDEBUG
+        check(std::wcsstr(visible.text.data(), L"[") && std::wcsstr(visible.text.data(), L"Byte de entrada 4"));
+#else
+        check(!std::wcsstr(visible.text.data(), L"[") && !std::wcsstr(visible.text.data(), L"Byte")
+            && !std::wcsstr(visible.text.data(), L"byte") && !std::wcsstr(visible.text.data(), L"desde cero"));
+#endif
+    };
+    ldap::SnapshotMetadata diagnosticScope{}; diagnosticScope.begin = 7; diagnosticScope.end = 20;
+    diagnosticScope.anchor = 7; diagnosticScope.caret = 20;
+    for (int code{}; code <= static_cast<int>(ldap::CaptureErrorCode::CommitIndeterminate); ++code) {
+        ldap::CaptureError error{static_cast<ldap::CaptureErrorCode>(code), 4, {}, diagnosticScope, ldap::ErrorPosition::Input};
+        checkDiagnostic(error); error.hostBlocked = true; checkDiagnostic(error);
+    }
+    for (int code{}; code <= static_cast<int>(ldap::LdapErrorCode::Cancelled); ++code) {
+        checkDiagnostic({ldap::CaptureErrorCode::Core, 4, ldap::ParseError{static_cast<ldap::LdapErrorCode>(code), 4},
+            diagnosticScope, ldap::ErrorPosition::Input});
+    }
+    const auto invalidAttribute{ldap::describeError({ldap::CaptureErrorCode::Core, 4,
+        ldap::ParseError{ldap::LdapErrorCode::InvalidAttribute, 4}})};
+#ifdef NDEBUG
+    check(std::wcsstr(invalidAttribute.text.data(), L"Revisa el nombre") && std::wcsstr(invalidAttribute.text.data(), L"(cn=valor)"));
+    const auto escape{ldap::describeError({ldap::CaptureErrorCode::Core, 9, ldap::ParseError{ldap::LdapErrorCode::InvalidEscape, 9}})};
+    check(std::wcsstr(escape.text.data(), L"escape inválido") && std::wcsstr(escape.text.data(), L"dos dígitos hexadecimales"));
+    const auto group{ldap::describeError({ldap::CaptureErrorCode::Core, 2, ldap::ParseError{ldap::LdapErrorCode::EmptyGroup, 2}})};
+    check(std::wcsstr(group.text.data(), L"grupo LDAP está vacío") && std::wcsstr(group.text.data(), L"Añade un filtro"));
+    const auto encoding{ldap::describeError({ldap::CaptureErrorCode::Encoding, 0})};
+    check(std::wcsstr(encoding.text.data(), L"UTF-8") && std::wcsstr(encoding.text.data(), L"Convierte su codificación"));
+    const auto changedDiagnostic{ldap::describeError({ldap::CaptureErrorCode::DocumentChanged, 0})};
+    check(std::wcsstr(changedDiagnostic.text.data(), L"cambió durante el formateo") && std::wcsstr(changedDiagnostic.text.data(), L"Vuelve a seleccionar"));
+    ldap::CaptureError blocked{ldap::CaptureErrorCode::Core, 4, ldap::ParseError{ldap::LdapErrorCode::InvalidAttribute, 4}};
+    blocked.hostBlocked = true;
+    const auto hostBlocked{ldap::describeError(blocked)};
+    check(std::wcsstr(hostBlocked.text.data(), L"estado del editor") && std::wcsstr(hostBlocked.text.data(), L"reinicia Notepad++")
+        && !std::wcsstr(hostBlocked.text.data(), L"atributo inválido") && hostBlocked.error.core->offset == 4 && hostBlocked.error.hostBlocked);
+#else
+    check(std::wcsstr(invalidAttribute.text.data(), L"[InvalidAttribute]"));
+#endif
+    return failures;
+}
+
 int main() {
     WNDCLASSW klass{};
     klass.lpfnWndProc = procedure;
@@ -234,7 +284,7 @@ int main() {
     gateway.initialize({host.handle, main.handle, second.handle});
     auto budget{std::make_shared<ldap::CoreBudget>()};
     const auto baseline{budget->used()};
-    int failures{};
+    int failures{diagnosticTests()};
     const auto check = [&](bool passed) { if (!passed) { ++failures; std::cerr << "Case failed\n"; } };
     for (int view{}; view != 2; ++view) {
         state.active = view;
@@ -385,9 +435,14 @@ int main() {
             check(observation.count == 1 && observation.owner == host.handle
                 && observation.error.code == ldap::CaptureErrorCode::InvalidUtf8 && observation.error.offset == 4
                 && observation.error.position == ldap::ErrorPosition::Input && observation.error.scope
-                && observation.error.scope->begin == 4
-                && std::wcsstr(observation.text.data(), L"UTF-8 inválido [InvalidUtf8]")
+                && observation.error.scope->begin == 4);
+#ifndef NDEBUG
+            check(std::wcsstr(observation.text.data(), L"UTF-8 inválido [InvalidUtf8]")
                 && std::wcsstr(observation.text.data(), L"Byte de entrada 4 (desde cero, selección capturada); byte documental 8"));
+#else
+            check(std::wcsstr(observation.text.data(), L"Corrige la codificación")
+                && !std::wcsstr(observation.text.data(), L"[") && !std::wcsstr(observation.text.data(), L"Byte"));
+#endif
         }
         check(state.text == originalText && state.anchor == anchor && state.caret == caret && state.undoTexts == undo && state.redoTexts == redo
             && state.replacements == edits && state.addedTokens == tokens && state.selectionSets == sets);

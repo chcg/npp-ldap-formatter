@@ -6,6 +6,7 @@
 namespace ldap {
 VisibleDiagnostic describeError(CaptureError error) noexcept {
     VisibleDiagnostic result{}; result.error = error;
+#ifndef NDEBUG
     const wchar_t* code{L"Api"}; const wchar_t* cause{L"Fallo de la API del editor"};
     if (error.core) {
         constexpr std::array codes{L"InvalidUtf8", L"InvalidSyntax", L"InvalidAttribute", L"InvalidEscape", L"UnsupportedFilter",
@@ -44,6 +45,46 @@ VisibleDiagnostic describeError(CaptureError error) noexcept {
         (void)swprintf_s(position.data(), position.size(), L"Posición no disponible (%ls)", scope);
     } else { (void)swprintf_s(position.data(), position.size(), L"Posición no disponible"); }
     (void)swprintf_s(result.text.data(), result.text.size(), L"%ls [%ls].\n%ls.", cause, code, position.data());
+#else
+    const wchar_t* cause{L"No se pudo acceder al editor. Vuelve a seleccionar el filtro e inténtalo de nuevo."};
+    if (error.core) {
+        constexpr std::array causes{
+            L"El texto contiene caracteres UTF-8 inválidos. Corrige la codificación del documento e inténtalo de nuevo.",
+            L"El filtro LDAP no tiene un formato válido. Revisa la expresión; por ejemplo: (atributo=valor).",
+            L"El filtro LDAP contiene un atributo inválido. Revisa el nombre; por ejemplo: (cn=valor).",
+            L"El filtro LDAP contiene un escape inválido. Usa una barra inversa seguida de dos dígitos hexadecimales.",
+            L"El filtro LDAP usa una expresión no admitida. Revisa que tenga el formato (atributo=valor).",
+            L"El grupo LDAP está vacío. Añade un filtro dentro de los paréntesis.",
+            L"El grupo LDAP tiene un número de filtros incorrecto. Revisa los filtros de los operadores &, | y !.",
+            L"El filtro LDAP tiene paréntesis incompletos. Revisa que cada paréntesis de apertura tenga su cierre.",
+            L"El filtro LDAP tiene demasiados niveles anidados. Divide o simplifica la expresión.",
+            L"El texto contiene un carácter nulo no admitido. Elimínalo antes de formatear.",
+            L"No hay recursos suficientes para formatear. Selecciona un filtro más pequeño e inténtalo de nuevo.",
+            L"No se pudo formatear el filtro LDAP. Vuelve a intentarlo; si persiste, reinicia Notepad++.",
+            L"El texto seleccionado es demasiado grande. Selecciona un filtro más pequeño.",
+            L"El resultado del formateo sería demasiado grande. Selecciona un filtro más pequeño.",
+            L"No hay memoria suficiente para formatear. Selecciona un filtro más pequeño e inténtalo de nuevo.",
+            L"El formateo se canceló. Vuelve a seleccionar el filtro e inténtalo de nuevo."};
+        const auto index{static_cast<std::size_t>(error.core->code)};
+        if (index < causes.size()) { cause = causes[index]; }
+    } else {
+        constexpr std::array causes{
+            L"No se pudo acceder al editor. Vuelve a seleccionar el filtro e inténtalo de nuevo.",
+            L"El documento o la selección cambió durante el formateo. Vuelve a seleccionar el filtro e inténtalo de nuevo.",
+            L"El editor no permite formatear en su estado actual. Usa una sola selección de texto, sin modo rectangular, en un documento editable con deshacer habilitado.",
+            L"El documento debe usar UTF-8. Convierte su codificación a UTF-8 desde Notepad++ e inténtalo de nuevo.",
+            L"El texto contiene caracteres UTF-8 inválidos. Corrige la codificación del documento e inténtalo de nuevo.",
+            L"El texto contiene un carácter nulo no admitido. Elimínalo antes de formatear.",
+            L"El texto seleccionado es demasiado grande. Selecciona un filtro más pequeño.",
+            L"No hay recursos suficientes para formatear. Selecciona un filtro más pequeño e inténtalo de nuevo.",
+            L"El filtro LDAP no tiene un formato válido. Revisa la expresión; por ejemplo: (atributo=valor).",
+            L"No se pudo confirmar el resultado en el editor. Revisa el documento y reinicia Notepad++ antes de volver a formatear."};
+        const auto index{static_cast<std::size_t>(error.code)};
+        if (index < causes.size()) { cause = causes[index]; }
+    }
+    if (error.hostBlocked) { cause = L"No se pudo confirmar el estado del editor. Revisa el documento y reinicia Notepad++ antes de volver a formatear."; }
+    (void)swprintf_s(result.text.data(), result.text.size(), L"%ls", cause);
+#endif
     return result;
 }
 CaptureError PluginController::coreError(const FormatDelivery& delivery) noexcept {

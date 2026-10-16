@@ -187,9 +187,8 @@ void appendCheckedRange(BudgetString& output, std::string_view input,
         && (token[1] == 'n' || token[1] == 'N');
 }
 
-[[nodiscard]] LeafResult scanAssertionLeaf(std::string_view input, std::size_t open, Checkpoint& stop) {
+[[nodiscard]] LeafResult scanAssertionLeaf(std::string_view input, std::size_t begin, Checkpoint& stop) {
     PhaseGuard phase{stop, CorePhase::Value};
-    const std::size_t begin{open + 1};
     std::size_t cursor{begin};
     while (cursor < input.size()) {
         stop.check(cursor);
@@ -369,10 +368,12 @@ template<class Consumer>
     std::size_t depth{};
     std::size_t cursor{};
     State state{State::NeedFilter};
+    skipStructuralSpace(input, cursor, stop);
 
     while (true) {
         stop.check(cursor);
         if (state == State::Done) {
+            skipStructuralSpace(input, cursor, stop);
             if (cursor == input.size()) { return std::nullopt; }
             return ParseError{input[cursor] == ')' ? LdapErrorCode::UnbalancedParenthesis
                                                      : LdapErrorCode::InvalidSyntax, cursor};
@@ -428,9 +429,9 @@ template<class Consumer>
             state = State::NeedChild;
             continue;
         }
-        const auto leaf{scanAssertionLeaf(input, cursor, stop)};
+        const auto leaf{scanAssertionLeaf(input, component, stop)};
         if (leaf.error.has_value()) { return leaf.error; }
-        if (const auto bad{consume(Event{EventKind::Leaf, cursor, leaf.next, 0})}; bad) { return bad; }
+        if (const auto bad{consume(Event{EventKind::Leaf, component, leaf.next, 0})}; bad) { return bad; }
         cursor = leaf.next;
         if (depth == 0) { state = State::Done; }
         else { ++stack[depth - 1].children; state = State::AfterChild; }
@@ -454,7 +455,7 @@ struct Consumer {
         const bool indent{options.mode == OutputMode::Pretty
             && (event.kind == EventKind::Close || depth != 0)};
         const std::size_t content{event.kind == EventKind::Open ? 2
-            : event.kind == EventKind::Close ? 1 : event.end - event.begin};
+            : event.kind == EventKind::Close ? 1 : 1 + event.end - event.begin};
         const std::size_t prefix{indent ? eol.size() + depth * 2 : 0};
         if (!overflow && (prefix > MaxOutputBytes - size
             || content > MaxOutputBytes - size - prefix)) {
@@ -470,6 +471,7 @@ struct Consumer {
                 if (event.kind == EventKind::Open) { output->push_back('('); output->push_back(event.op); }
                 else if (event.kind == EventKind::Close) { output->push_back(')'); }
                 else {
+                    output->push_back('(');
                     appendCheckedRange(*output, input, event.begin, event.end, stop);
                 }
             }

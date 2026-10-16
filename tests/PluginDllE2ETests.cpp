@@ -13,6 +13,16 @@ struct Observation {
     UINT flags{};
     std::wstring title{}, diagnostic{};
 } observation;
+bool diagnosticMatches(const std::wstring& code) {
+#ifndef NDEBUG
+    return observation.diagnostic.find(L"[" + code + L"]") != std::wstring::npos;
+#else
+    return !observation.diagnostic.empty() && observation.diagnostic.find(code) == std::wstring::npos
+        && observation.diagnostic.find(L"[") == std::wstring::npos
+        && observation.diagnostic.find(L"Byte") == std::wstring::npos
+        && observation.diagnostic.find(L"byte") == std::wstring::npos;
+#endif
+}
 int WINAPI observeMessageBox(HWND owner, LPCWSTR text, LPCWSTR title, UINT flags) {
     ++observation.count; observation.owner = owner; observation.flags = flags;
     observation.title = title ? title : L""; observation.diagnostic = text ? text : L""; return IDOK;
@@ -148,6 +158,24 @@ int wmain(int argc, wchar_t* argv[]) {
             ++cases;
           } } }
         } }
+        // Structural and peripheral whitespace in real selections normalizes
+        // without changing value whitespace or losing selection orientation.
+        for (int command{}; command != 2; ++command) { for (int direction{}; direction != 3; ++direction) {
+            host.documents = {}; host.active = 0; auto& d{host.documents[0]};
+            const std::string selected{" \t\r\n(\r\n\tcn= value ) \n"};
+            const bool full{direction == 2}, reverse{direction == 1};
+            const Sci_Position begin{full ? 0 : 4}, end{begin + static_cast<Sci_Position>(selected.size())};
+            d.image = {full ? selected : "pre " + selected + " post", full ? 3 : reverse ? end : begin, full ? 3 : reverse ? begin : end};
+            const auto original{d.image}; const auto notices{observation.count};
+            Session session{host, info, notify}; commands[command]._pFunc();
+            check(e2e::SimulatedNppHost::pumpUntil([&] { return d.ends == 1; }));
+            const std::string formatted{"(cn= value )"};
+            const auto outputEnd{begin + static_cast<Sci_Position>(formatted.size())};
+            const e2e::Image expected{full ? formatted : "pre " + formatted + " post", reverse ? outputEnd : begin, reverse ? begin : outputEnd};
+            check(d.image == expected && d.replacements == 1 && observation.count == notices);
+            host.undo(0); check(d.image == original);
+            host.undo(0, true); check(d.image == expected); ++cases;
+        } }
         // Rejections exercise the real worker and deferred production presenter.
         for (int rejection{}; rejection != 18; ++rejection) {
             host.documents = {}; host.active = 0; auto& d{host.documents[0]};
@@ -175,14 +203,19 @@ int wmain(int argc, wchar_t* argv[]) {
             const auto original{d.image}; const auto history{d.history}; const auto notices{observation.count};
             Session session{host, info, notify}; commands[0]._pFunc(); check(observation.count == notices);
             check(e2e::SimulatedNppHost::pumpUntil([&] { return observation.count > notices; }));
-            if (observation.diagnostic.find(L"[" + code + L"]") == std::wstring::npos) {
+            if (!diagnosticMatches(code)) {
                 std::cerr << "Diagnostic mismatch for rejection " << rejection << '\n';
             }
             check(observation.count == notices + 1 && observation.owner == host.host && observation.flags == (MB_OK | MB_ICONERROR)
-                && observation.title == L"LDAP Formatter" && observation.diagnostic.find(L"[" + code + L"]") != std::wstring::npos);
+                && observation.title == L"LDAP Formatter" && diagnosticMatches(code));
             check(d.image == original && d.history == history && d.cursor == 0 && d.replacements == 0 && d.begins == 0 && d.ends == 0); ++cases;
+#ifndef NDEBUG
             if (rejection == 0) { check(observation.diagnostic.find(L"UTF-8 inválido") != std::wstring::npos && observation.diagnostic.find(L"Byte de entrada 0") != std::wstring::npos); }
             if (rejection == 17) { check(observation.diagnostic.find(L"Byte de entrada 4") != std::wstring::npos && observation.diagnostic.find(L"byte documental 8") != std::wstring::npos); }
+#else
+            if (rejection == 0 || rejection == 17) { check(observation.diagnostic.find(L"Corrige la codificación") != std::wstring::npos); }
+            if (rejection == 2) { check(observation.diagnostic.find(L"Revisa que cada paréntesis") != std::wstring::npos); }
+#endif
         }
         // Eligible selection in an otherwise oversized document.
         { host.documents = {}; auto& d{host.documents[0]}; host.active = 0;
@@ -207,7 +240,7 @@ int wmain(int argc, wchar_t* argv[]) {
             commands[1]._pFunc(); check(e2e::SimulatedNppHost::pumpUntil([&] { return d.ends == 1; }));
             // Identity-loss diagnostics are intentionally silent.
             if (fault != 4 && fault != 5) { check(e2e::SimulatedNppHost::pumpUntil([&] { return observation.count > notices; }));
-                check(observation.diagnostic.find(L"[CommitIndeterminate]") != std::wstring::npos); }
+                check(diagnosticMatches(L"CommitIndeterminate")); }
             const bool textEqual{d.image.bytes == original.bytes}, selectionEqual{d.image.anchor == original.anchor && d.image.caret == original.caret}, historyEqual{d.history == history};
             faults[static_cast<std::size_t>(fault)] = {textEqual, selectionEqual, historyEqual, d.replacements, d.undoCalls};
             if (!textEqual || !selectionEqual || !historyEqual) { ++integrityLoss; }
@@ -263,7 +296,7 @@ int wmain(int argc, wchar_t* argv[]) {
           check(e2e::SimulatedNppHost::pumpUntil([&] { return observation.count > notices; }));
           check(d.image == original && d.history == history && d.cursor == 1 && d.replacements == 0
               && d.undoCalls == 0 && d.begins == 1 && d.ends == 0 && d.groupDepth == 1
-              && observation.diagnostic.find(L"[UnsupportedState]") != std::wstring::npos);
+              && diagnosticMatches(L"UnsupportedState"));
           SendMessageW(host.views[0], SCI_ENDUNDOACTION, 0, 0); ++cases; }
         // A token is its own raw action even if replacement fails before editing;
         // inserting it drops an existing Redo tail, which cannot be recovered.

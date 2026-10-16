@@ -502,13 +502,13 @@ void quotasAndCancellation() {
         if (!signal.observed) { std::cerr << "Unobserved phase: " << static_cast<int>(phase) << '\n'; }
         require(signal.observed && !result.ok() && result.text.empty()
             && result.error->code == LdapErrorCode::Cancelled && result.error->offset <= source.size()
-            && (phase != ldap::CorePhase::Copy || result.error->offset == 1024),
+            && (phase != ldap::CorePhase::Copy || result.error->offset == 1025),
             "Controlled cancellation phase failed");
         require(budget->used() == baseline, "Cancellation leaked temporary/output reservations");
     }
     {
         const std::string nested{"(&(cn=" + std::string(8192, 'x') + "))"};
-        constexpr std::size_t leafBegin{2};
+        constexpr std::size_t leafBegin{3};
         StopAt nestedSignal{{}, ldap::CorePhase::Copy, false, leafBegin + 1024};
         options.stop = nestedSignal.source.get_token();
         options.checkpointContext = &nestedSignal;
@@ -641,6 +641,20 @@ int main() {
     idempotentModes("(\n|(cn=a)(sn=b))", "(|(cn=a)(sn=b))",
         "(|\n  (cn=a)\n  (sn=b)\n)", ldap::Eol::Lf);
     formatted("(cn= John  Doe )", prettyLf, "(cn= John  Doe )");
+    for (const auto space : {" ", "\t", "\r\n", "\n", "\r", " \t\r\n "}) {
+        const std::string leaf{"(" + std::string{space} + "cn= John\r\n Doe \\20 )"};
+        idempotentModes(" \t\r\n" + leaf + "\n ", "(cn= John\r\n Doe \\20 )",
+            "(cn= John\r\n Doe \\20 )", ldap::Eol::Lf);
+        idempotentModes(" \n(&" + leaf + "(" + space + "age>=21))\r\n",
+            "(&(cn= John\r\n Doe \\20 )(age>=21))",
+            "(&\r\n  (cn= John\r\n Doe \\20 )\r\n  (age>=21)\r\n)", ldap::Eol::CrLf);
+        formatted("(" + std::string{space} + ":rule:= value )", compact, "(:rule:= value )");
+    }
+    formatInvalid(" \r\n( \ncn_name=x) ", LdapErrorCode::InvalidAttribute, 8);
+    formatInvalid(" \n( \ncn=\\GG) ", LdapErrorCode::InvalidEscape, 8);
+    formatInvalid(" \n( cn=\xC0) ", LdapErrorCode::InvalidUtf8, 7);
+    formatInvalid("\v(cn=x)", LdapErrorCode::InvalidSyntax, 0);
+    formatInvalid(" (cn=x) text ", LdapErrorCode::InvalidSyntax, 8);
     const auto defaultPretty{ldap::formatFilter("(&(cn=a)(sn=b))")};
     if (!defaultPretty.ok() || defaultPretty.text != "(&\r\n  (cn=a)\r\n  (sn=b)\r\n)") {
         std::cerr << "Default mode must be Pretty with CRLF\n";
@@ -714,12 +728,12 @@ int main() {
     formatInvalid("(&(cn_name=a))", LdapErrorCode::InvalidAttribute, 5);
     formatInvalid("(&(cn=\\GG))", LdapErrorCode::InvalidEscape, 6);
     formatInvalid(std::string{"(&(cn=a\0b))", 11}, LdapErrorCode::RawNul, 7);
-    formatInvalid(" (cn=a)", LdapErrorCode::InvalidSyntax, 0);
-    formatInvalid("(cn=a) ", LdapErrorCode::InvalidSyntax, 6);
-    formatInvalid("( cn = foo )", LdapErrorCode::InvalidAttribute, 1);
+    formatted(" (cn=a)", compact, "(cn=a)");
+    formatted("(cn=a) ", compact, "(cn=a)");
+    formatInvalid("( cn = foo )", LdapErrorCode::InvalidAttribute, 4);
     formatInvalid("( \t\r\n", LdapErrorCode::UnbalancedParenthesis, 5);
     formatInvalid("( \t)", LdapErrorCode::InvalidSyntax, 3);
-    formatInvalid("( \nX=foo)", LdapErrorCode::InvalidAttribute, 1);
+    formatted("( \nX=foo)", compact, "(X=foo)");
     formatInvalid(std::string{"bad=\xC0"}, LdapErrorCode::InvalidUtf8, 4);
 
     formatted(nestedNot(5), compact, nestedNot(5));

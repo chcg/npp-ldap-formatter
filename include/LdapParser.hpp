@@ -79,12 +79,13 @@ struct FormatResult {
 // Analiza grupos AND/OR/NOT y assertions RFC 4515 con pila explícita.
 // Cuenta la raíz: acepta hasta 128 filtros abiertos y rechaza el siguiente '('.
 // La entrada permite SP/HTAB/CR/LF solo entre nodos y entre '(' y un operador
-// lógico, en ambos modos; no los admite dentro de assertions ni fuera de la raíz.
-// Compact elimina solo esos separadores estructurales.
+// lógico, tras '(' antes de un atributo/regla y fuera de la raíz, en ambos modos.
+// Pretty y Compact eliminan esos separadores estructurales redundantes.
 // UTF-8 de toda la entrada se valida antes de diagnosticar la estructura.
 // Presencia/subcadena distinguen '*' crudo de escapes hexadecimales; extensible
 // admite atributo opcional solo cuando hay regla de coincidencia.
-// Ambos modos preservan cada byte de las hojas. No devuelve salida parcial ni lanza.
+// Ambos modos preservan cada byte de los valores y escapes de las hojas.
+// Los offsets siempre se refieren a la entrada original. No devuelve salida parcial ni lanza.
 [[nodiscard]] FormatResult formatFilter(
     std::string_view input, FormatOptions options = {}) noexcept;
 
