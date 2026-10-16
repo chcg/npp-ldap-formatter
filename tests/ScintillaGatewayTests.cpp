@@ -457,7 +457,7 @@ int main() {
       check(captured.ok());
       if (captured.ok()) {
         const auto formatted{ldap::formatFilter(captured.snapshot->text())};
-        const auto commit{gateway.commit(*captured.snapshot, formatted.text, budget)};
+        const auto commit{gateway.commit(*captured.snapshot, formatted.textView(), budget)};
         check(commit.ok() && commit.applied && state.replacements == 1 && state.begins == 1 && state.ends == 1);
         const auto post{state.text};
         SendMessageW(main.handle, SCI_UNDO, 0, 0); check(state.text == original);
@@ -479,12 +479,12 @@ int main() {
           if (!captured.ok()) { continue; }
           ldap::FormatOptions options{}; options.mode = mode;
           auto formatted{ldap::formatFilter(captured.snapshot->text(), options)};
-          const auto outside{state.text.substr(0, static_cast<std::size_t>(begin)) + std::string{formatted.text} + state.text.substr(static_cast<std::size_t>(end))};
+          const auto outside{state.text.substr(0, static_cast<std::size_t>(begin)) + std::string{formatted.textView()} + state.text.substr(static_cast<std::size_t>(end))};
           const auto replacements{state.replacements}, begins{state.begins}, ends{state.ends};
-          const auto result{gateway.commit(*captured.snapshot, formatted.text, budget)};
+          const auto result{gateway.commit(*captured.snapshot, formatted.textView(), budget)};
           check(result.ok() && result.applied && state.text == outside && state.replacements == replacements + 1
             && state.begins == begins + 1 && state.ends == ends + 1);
-          const auto outputEnd{begin + static_cast<Sci_Position>(formatted.text.size())};
+          const auto outputEnd{begin + static_cast<Sci_Position>(formatted.textView().size())};
           check(state.anchor == (direction == 1 ? outputEnd : begin) && state.caret == (direction == 1 ? begin : outputEnd));
         }
       }
@@ -511,7 +511,7 @@ int main() {
         check(formatted.ok());
         if (!formatted.ok()) { break; }
         const auto replacements{state.replacements}, begins{state.begins}, ends{state.ends};
-        const auto result{gateway.commit(*captured.snapshot, formatted.text, budget)};
+        const auto result{gateway.commit(*captured.snapshot, formatted.textView(), budget)};
         const auto& expected{step < 2 ? pretty : compact};
         const auto postEnd{begin + static_cast<Sci_Position>(expected.size())};
         const bool changed{step == 0 || step == 2};

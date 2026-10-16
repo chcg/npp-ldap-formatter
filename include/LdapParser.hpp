@@ -37,10 +37,13 @@ struct ParseError {
 struct ParseResult {
     CoreBudget::Reservation storage{};
     // Solo contiene bytes cuando ok() es true; nunca entrega salida parcial.
-    BudgetString compact{};
+    std::shared_ptr<BudgetString> compact{};
     std::optional<ParseError> error{};
 
     [[nodiscard]] bool ok() const noexcept { return !error.has_value(); }
+    [[nodiscard]] std::string_view compactView() const noexcept {
+        return compact ? std::string_view{*compact} : std::string_view{};
+    }
 };
 
 enum class OutputMode { Pretty, Compact };
@@ -64,10 +67,13 @@ struct FormatOptions {
 
 struct FormatResult {
     CoreBudget::Reservation storage{};
-    BudgetString text{};
+    std::shared_ptr<BudgetString> text{};
     std::optional<ParseError> error{};
 
     [[nodiscard]] bool ok() const noexcept { return !error.has_value(); }
+    [[nodiscard]] std::string_view textView() const noexcept {
+        return text ? std::string_view{*text} : std::string_view{};
+    }
 };
 
 // Acepta únicamente (attr=value) RFC 4515, sin espacios fuera de la hoja.

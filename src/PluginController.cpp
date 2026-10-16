@@ -139,7 +139,7 @@ void PluginController::processDelivery(FormatDelivery& delivery) noexcept {
         };
         std::optional<UndoRecord>* slot{};
         int token{};
-        const bool changes{delivery.result.text != delivery.snapshot.text()};
+        const bool changes{delivery.result.textView() != delivery.snapshot.text()};
         if (changes && nextToken_ > 0) {
             for (auto& record : records_) { if (!record) { slot = &record; break; } }
         }
@@ -153,7 +153,7 @@ void PluginController::processDelivery(FormatDelivery& delivery) noexcept {
                 *slot = UndoRecord{delivery.snapshot.metadata, {}, session_, delivery.generation, token, false};
                 trace(0, 0, token, ProbePhase::Commit, &delivery.snapshot.metadata);
             }
-            committed = gateway_.commit(delivery.snapshot, delivery.result.text, budget_, current, &validity, token);
+            committed = gateway_.commit(delivery.snapshot, delivery.result.textView(), budget_, current, &validity, token);
             if (committed.error && committed.error->code == CaptureErrorCode::CommitIndeterminate) { hostGateFailed_ = true; }
             if (slot && *slot) {
                 const auto finalIdentity{gateway_.identity()};

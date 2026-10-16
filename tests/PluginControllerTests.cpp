@@ -592,7 +592,7 @@ int main() {
           const auto expected{ldap::formatFilter(state.text, options)};
           const auto count{state.replacements};
           controller.submit(mode); check(finish(controller));
-          check(!controller.error() && state.text == expected.text && state.replacements == count + 1);
+          check(!controller.error() && state.text == expected.textView() && state.replacements == count + 1);
           controller.poll(); check(!controller.takeDelivery() && state.replacements == count + 1);
           check(controller.ownedBytes() == baseline);
         }

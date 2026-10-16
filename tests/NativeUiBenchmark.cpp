@@ -171,19 +171,19 @@ void completeIteration() {
     stage = 3;
     auto& sample{samples[iteration]};
     sample.maxGap = std::max(sample.maxGap, elapsed(previousTick, now()));
-    if (postFailed.load() || !formatted || !formatted->ok() || formatted->text.empty()
-        || formatted->text.size() > ldap::MaxOutputBytes || std::string_view{formatted->text} == snapshot->text()) {
+    if (postFailed.load() || !formatted || !formatted->ok() || formatted->textView().empty()
+        || formatted->textView().size() > ldap::MaxOutputBytes || formatted->textView() == snapshot->text()) {
         if (formatted && formatted->error) { failureCode = 1 + static_cast<unsigned>(formatted->error->code); }
         throw std::runtime_error{"Worker failure"};
     }
     stage = 4;
     const auto begin{now()};
-    const auto commit{gateway.commit(*snapshot, formatted->text, budget)};
+    const auto commit{gateway.commit(*snapshot, formatted->textView(), budget)};
     const auto end{now()};
     sample.commit = elapsed(begin, end);
     sample.total = elapsed(totalStart, end);
     if (!commit.ok() || !commit.applied) { if (commit.error) { failureCode = 1 + static_cast<unsigned>(commit.error->code); } throw std::runtime_error{"Commit failure"}; }
-    sample.output = formatted->text.size();
+    sample.output = formatted->textView().size();
     sample.peak = budget->peak();
     stage = 5;
     // Byte oracle and cleanup are outside every measured phase.
@@ -193,7 +193,7 @@ void completeIteration() {
     if (SendMessageW(view, SCI_GETTEXT, observed.size(), reinterpret_cast<LPARAM>(observed.data()))
             != static_cast<LRESULT>(sample.output) || observed.back() != '\0'
         || SendMessageW(view, SCI_GETSTATUS, 0, 0) != SC_STATUS_OK
-        || std::string_view{observed.data(), sample.output} != std::string_view{formatted->text}) {
+        || std::string_view{observed.data(), sample.output} != formatted->textView()) {
         throw std::runtime_error{"Commit oracle failure"};
     }
     memory();

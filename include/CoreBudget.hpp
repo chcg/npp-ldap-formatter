@@ -62,6 +62,9 @@ public:
     using propagate_on_container_move_assignment = std::true_type;
     using propagate_on_container_swap = std::true_type;
     BudgetAllocator() noexcept = default;
+    // A moved-from Debug container still owns iterator bookkeeping to release.
+    BudgetAllocator(const BudgetAllocator&) noexcept = default;
+    BudgetAllocator& operator=(const BudgetAllocator&) noexcept = default;
     explicit BudgetAllocator(std::shared_ptr<CoreBudget> budget) noexcept : budget_{std::move(budget)} {}
     template<class U> BudgetAllocator(const BudgetAllocator<U>& other) noexcept : budget_{other.budget()} {}
     [[nodiscard]] T* allocate(std::size_t count) {

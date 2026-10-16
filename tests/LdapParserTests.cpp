@@ -13,12 +13,16 @@
 
 namespace {
 std::atomic<bool> failNextAllocation{};
+std::atomic<std::ptrdiff_t> failAllocationAfter{-1};
 }
 #ifdef _MSC_VER
 _Ret_notnull_ _Post_writable_byte_size_(bytes)
 #endif
 void* operator new(std::size_t bytes) {
     if (failNextAllocation.exchange(false)) { throw std::bad_alloc{}; }
+    if (failAllocationAfter.load() >= 0 && failAllocationAfter.fetch_sub(1) == 0) {
+        throw std::bad_alloc{};
+    }
     if (auto* pointer{std::malloc(bytes == 0 ? 1 : bytes)}) { return pointer; }
     throw std::bad_alloc{};
 }
@@ -36,13 +40,13 @@ int failures{};
 
 void valid(std::string_view input) {
     const auto result{ldap::parseSimpleEquality(input)};
-    if (!result.ok() || result.compact != input) {
+    if (!result.ok() || result.compactView() != input) {
         std::cerr << "Valid filter rejected or bytes changed\n";
         ++failures;
         return;
     }
-    const auto repeated{ldap::parseSimpleEquality(result.compact)};
-    if (!repeated.ok() || repeated.compact != result.compact) {
+    const auto repeated{ldap::parseSimpleEquality(result.compactView())};
+    if (!repeated.ok() || repeated.compactView() != result.compactView()) {
         std::cerr << "Compact output is not idempotent\n";
         ++failures;
     }
@@ -50,7 +54,7 @@ void valid(std::string_view input) {
 
 void invalid(std::string_view input, ldap::LdapErrorCode code, std::size_t offset) {
     const auto result{ldap::parseSimpleEquality(input)};
-    if (result.ok() || !result.compact.empty() || result.error->code != code
+    if (result.ok() || !result.compactView().empty() || result.error->code != code
         || result.error->offset != offset) {
         std::cerr << "Wrong error code/offset or partial output\n";
         ++failures;
@@ -59,13 +63,13 @@ void invalid(std::string_view input, ldap::LdapErrorCode code, std::size_t offse
 
 void formatted(std::string_view input, ldap::FormatOptions options, std::string_view expected) {
     const auto result{ldap::formatFilter(input, options)};
-    if (!result.ok() || result.text != expected) {
+    if (!result.ok() || result.textView() != expected) {
         std::cerr << "Structural formatter changed expected bytes\n";
         ++failures;
         return;
     }
-    const auto repeated{ldap::formatFilter(result.text, options)};
-    if (!repeated.ok() || repeated.text != expected) {
+    const auto repeated{ldap::formatFilter(result.textView(), options)};
+    if (!repeated.ok() || repeated.textView() != expected) {
         std::cerr << "Structural formatter is not idempotent\n";
         ++failures;
     }
@@ -78,7 +82,7 @@ void formatInvalid(std::string_view input, ldap::LdapErrorCode code, std::size_t
             if (code == ldap::LdapErrorCode::OutputTooLarge
                 && (mode != ldap::OutputMode::Pretty || eol != ldap::Eol::CrLf)) { continue; }
             const auto result{ldap::formatFilter(input, {mode, eol})};
-            if (result.ok() || !result.text.empty() || result.error->code != code
+            if (result.ok() || !result.textView().empty() || result.error->code != code
                 || result.error->offset != offset) {
                 std::cerr << "Wrong structural error for " << input.substr(0, 80)
                     << " mode=" << static_cast<int>(mode) << " EOL=" << static_cast<int>(eol)
@@ -100,26 +104,26 @@ void idempotentModes(std::string_view input, std::string_view expectedCompact,
     const ldap::FormatOptions pretty{ldap::OutputMode::Pretty, eol};
     const auto compactOnce{ldap::formatFilter(input, compact)};
     const auto prettyOnce{ldap::formatFilter(input, pretty)};
-    if (!compactOnce.ok() || compactOnce.text != expectedCompact
-        || !prettyOnce.ok() || prettyOnce.text != expectedPretty) {
+    if (!compactOnce.ok() || compactOnce.textView() != expectedCompact
+        || !prettyOnce.ok() || prettyOnce.textView() != expectedPretty) {
         std::cerr << "Cross-mode fixture " << input.substr(0, 80)
             << " EOL=" << static_cast<int>(eol) << " canonical bytes failed\n";
         ++failures;
         return;
     }
-    const auto compactTwice{ldap::formatFilter(compactOnce.text, compact)};
-    const auto prettyTwice{ldap::formatFilter(prettyOnce.text, pretty)};
-    const auto compactFromPretty{ldap::formatFilter(prettyOnce.text, compact)};
-    const auto prettyFromCompact{ldap::formatFilter(compactOnce.text, pretty)};
-    if (!compactTwice.ok() || compactTwice.text != expectedCompact
-        || !prettyTwice.ok() || prettyTwice.text != expectedPretty
-        || !compactFromPretty.ok() || compactFromPretty.text != expectedCompact
-        || !prettyFromCompact.ok() || prettyFromCompact.text != expectedPretty) {
+    const auto compactTwice{ldap::formatFilter(compactOnce.textView(), compact)};
+    const auto prettyTwice{ldap::formatFilter(prettyOnce.textView(), pretty)};
+    const auto compactFromPretty{ldap::formatFilter(prettyOnce.textView(), compact)};
+    const auto prettyFromCompact{ldap::formatFilter(compactOnce.textView(), pretty)};
+    if (!compactTwice.ok() || compactTwice.textView() != expectedCompact
+        || !prettyTwice.ok() || prettyTwice.textView() != expectedPretty
+        || !compactFromPretty.ok() || compactFromPretty.textView() != expectedCompact
+        || !prettyFromCompact.ok() || prettyFromCompact.textView() != expectedPretty) {
         std::cerr << "Fixture " << input.substr(0, 80) << " EOL=" << static_cast<int>(eol)
-            << " C(C)=" << (compactTwice.ok() && compactTwice.text == expectedCompact)
-            << " P(P)=" << (prettyTwice.ok() && prettyTwice.text == expectedPretty)
-            << " C(P)=" << (compactFromPretty.ok() && compactFromPretty.text == expectedCompact)
-            << " P(C)=" << (prettyFromCompact.ok() && prettyFromCompact.text == expectedPretty) << '\n';
+            << " C(C)=" << (compactTwice.ok() && compactTwice.textView() == expectedCompact)
+            << " P(P)=" << (prettyTwice.ok() && prettyTwice.textView() == expectedPretty)
+            << " C(P)=" << (compactFromPretty.ok() && compactFromPretty.textView() == expectedCompact)
+            << " P(C)=" << (prettyFromCompact.ok() && prettyFromCompact.textView() == expectedPretty) << '\n';
         ++failures;
     }
 }
@@ -217,14 +221,14 @@ void conformanceProperties() {
     for (const auto mode : {ldap::OutputMode::Pretty, ldap::OutputMode::Compact}) {
         for (const auto eol : {ldap::Eol::Lf, ldap::Eol::CrLf}) {
             const auto exhausted{ldap::formatFilter("(cn=x)", {mode, eol, {}, budget})};
-            if (exhausted.ok() || !exhausted.text.empty()
+            if (exhausted.ok() || !exhausted.textView().empty()
                 || exhausted.error->code != LdapErrorCode::MemoryExceeded
                 || exhausted.error->offset != 0 || budget->used() != ldap::MaxCoreBytes) {
                 std::cerr << "Memory diagnostic matrix failed\n";
                 ++failures;
             }
             const auto stopped{ldap::formatFilter("(cn=x)", {mode, eol, cancelled.get_token(), budget})};
-            if (stopped.ok() || !stopped.text.empty()
+            if (stopped.ok() || !stopped.textView().empty()
                 || stopped.error->code != LdapErrorCode::Cancelled || stopped.error->offset != 0) {
                 std::cerr << "Entry cancellation diagnostic matrix failed\n";
                 ++failures;
@@ -235,6 +239,93 @@ void conformanceProperties() {
 
 void require(bool condition, const char* message) {
     if (!condition) { std::cerr << message << '\n'; ++failures; }
+}
+
+void allocatorLifecycle() {
+    auto budget{std::make_shared<ldap::CoreBudget>()};
+    const auto baseline{budget->used()};
+    {
+        ldap::BudgetAllocator<char> source{budget};
+        auto moved{std::move(source)};
+        require(source.budget() == budget && moved.budget() == budget,
+            "Allocator move lost source ownership");
+        ldap::BudgetAllocator<char> assigned{};
+        assigned = std::move(moved);
+        require(moved.budget() == budget && assigned.budget() == budget,
+            "Allocator assignment lost source ownership");
+        ldap::BudgetString original{"value", source};
+        ldap::BudgetString destination{std::move(original)};
+        original.assign(64, 'x');
+        require(destination == std::string{"value"} && original.size() == 64,
+            "Moved-from budget string could not be reused");
+    }
+    require(budget->used() == baseline, "Allocator/string move leaked budget");
+    for (const auto from : {"short", "a source longer than the small string buffer"}) {
+        for (const auto to : {"short", "a target longer than the small string buffer"}) {
+            auto other{std::make_shared<ldap::CoreBudget>()};
+            const auto otherBaseline{other->used()};
+            {
+                ldap::BudgetString source{from, ldap::BudgetAllocator<char>{budget}};
+                ldap::BudgetString target{to, ldap::BudgetAllocator<char>{other}};
+                target = std::move(source);
+                source.assign(64, 'x');
+                require(target == std::string{from} && source.size() == 64,
+                    "Unequal-budget string move assignment lost bytes or source ownership");
+            }
+            require(budget->used() == baseline && other->used() == otherBaseline,
+                "Unequal-budget string move assignment leaked reservations");
+        }
+    }
+    failNextAllocation.store(true);
+    {
+        ldap::FormatResult formattedError{};
+        ldap::ParseResult parsedError{};
+        require(formattedError.textView().empty() && parsedError.compactView().empty(),
+            "Default result unexpectedly contains bytes");
+    }
+    const bool noAllocation{failNextAllocation.exchange(false)};
+    require(noAllocation, "Empty failure result allocated memory");
+    for (std::size_t allowance{}; allowance <= 256; ++allowance) {
+        auto held{budget->reserve(budget->remaining() - allowance)};
+        const auto charged{budget->used()};
+        try {
+            const auto text{std::allocate_shared<ldap::BudgetString>(
+                ldap::BudgetAllocator<ldap::BudgetString>{budget}, "", ldap::BudgetAllocator<char>{budget})};
+            require(text->empty(), "Fresh budget string contains bytes");
+        } catch (const ldap::BudgetExceeded&) {}
+        require(budget->used() == charged, "Output bookkeeping quota failure leaked storage");
+    }
+    require(budget->used() == baseline, "Output bookkeeping retained reservations");
+}
+
+void outputAllocationFailures() {
+    auto budget{std::make_shared<ldap::CoreBudget>()};
+    const auto baseline{budget->used()};
+    const std::string input{"(cn=" + std::string(512, 'x') + ")"};
+    ldap::FormatOptions options{ldap::OutputMode::Compact}; options.budget = budget;
+    const auto verify = [&](auto make, auto view) {
+        bool completed{};
+        for (std::ptrdiff_t skip{}; skip != 16 && !completed; ++skip) {
+            {
+                failAllocationAfter.store(skip);
+                const auto result{make(input, options)};
+                const bool injected{failAllocationAfter.exchange(-1) == -1};
+                if (injected) {
+                    require(!result.ok() && result.error->code == ldap::LdapErrorCode::ResourceFailure
+                        && view(result).empty(), "Output allocation failure escaped or returned bytes");
+                } else {
+                    require(result.ok() && view(result) == input, "Output allocation success changed bytes");
+                    completed = true;
+                }
+            }
+            require(budget->used() == baseline, "Output allocation failure retained reservations");
+        }
+        require(completed, "Allocation fault sweep never reached successful output");
+    };
+    verify([](std::string_view source, ldap::FormatOptions config) { return ldap::formatFilter(source, config); },
+        [](const ldap::FormatResult& result) { return result.textView(); });
+    verify([](std::string_view source, ldap::FormatOptions config) { return ldap::parseSimpleEquality(source, config); },
+        [](const ldap::ParseResult& result) { return result.compactView(); });
 }
 
 struct StopAt {
@@ -298,22 +389,22 @@ void quotasAndCancellation() {
     const std::string prettyExact{"(&(cn=" + std::string(ldap::MaxOutputBytes - 14, 'x') + "))"};
     {
         const auto result{ldap::formatFilter(prettyExact)};
-        require(result.ok() && result.text.size() == ldap::MaxOutputBytes, "Pretty exact quota failed");
-        if (result.ok()) { formatted(result.text, {}, result.text); }
+        require(result.ok() && result.textView().size() == ldap::MaxOutputBytes, "Pretty exact quota failed");
+        if (result.ok()) { formatted(result.textView(), {}, result.textView()); }
     }
     const std::string prettyOverflow{"(&(cn=" + std::string(ldap::MaxOutputBytes - 13, 'x') + "))"};
     formatInvalid(prettyOverflow, LdapErrorCode::OutputTooLarge, prettyOverflow.size() - 1);
     formatted(prettyOverflow, compact, prettyOverflow);
     const ldap::FormatOptions lf{ldap::OutputMode::Pretty, ldap::Eol::Lf};
     const auto lfResult{ldap::formatFilter(prettyOverflow, lf)};
-    require(lfResult.ok() && lfResult.text.size() == ldap::MaxOutputBytes - 1, "LF quota count failed");
+    require(lfResult.ok() && lfResult.textView().size() == ldap::MaxOutputBytes - 1, "LF quota count failed");
     const std::string lfExact{"(&(cn=" + std::string(ldap::MaxOutputBytes - 12, 'x') + "))"};
     const auto lfExactResult{ldap::formatFilter(lfExact, lf)};
-    require(lfExactResult.ok() && lfExactResult.text.size() == ldap::MaxOutputBytes,
+    require(lfExactResult.ok() && lfExactResult.textView().size() == ldap::MaxOutputBytes,
         "LF inclusive output maximum failed");
     const std::string lfOverflow{"(&(cn=" + std::string(ldap::MaxOutputBytes - 11, 'x') + "))"};
     const auto lfOverflowResult{ldap::formatFilter(lfOverflow, lf)};
-    require(!lfOverflowResult.ok() && lfOverflowResult.text.empty()
+    require(!lfOverflowResult.ok() && lfOverflowResult.textView().empty()
         && lfOverflowResult.error->code == LdapErrorCode::OutputTooLarge
         && lfOverflowResult.error->offset == lfOverflow.size() - 1,
         "LF output maximum plus one lacked exact diagnostic");
@@ -335,34 +426,36 @@ void quotasAndCancellation() {
         auto result{ldap::formatFilter(maximum, options)};
         require(result.ok(), "Externally reserved input rejected");
         const auto charged{budget->used()};
-        require(charged >= maximum.capacity() + 1 + result.text.capacity() + 1,
+        require(charged >= maximum.capacity() + 1 + result.text->capacity() + 1,
             "Capacities and terminators were not charged");
         auto moved{std::move(result)};
-        require(moved.ok() && moved.text == maximum && budget->used() == charged,
+        require(moved.ok() && moved.textView() == maximum && budget->used() == charged,
             "Moving result released live storage");
         auto textOnly{std::move(moved.text)};
-        require(textOnly == maximum && budget->used() == charged,
+        require(textOnly && *textOnly == maximum && budget->used() == charged,
             "Moving text released its allocation reservation");
     }
     require(budget->used() == baseline, "Results/snapshot leaked reservations");
     options.inputReservation = nullptr;
     {
-        ldap::BudgetString extracted{};
+        std::shared_ptr<ldap::BudgetString> extracted{};
+        std::size_t extractedCharge{};
         {
             auto shortResult{ldap::formatFilter("(a=)", options)};
             require(shortResult.ok(), "Short extracted-text fixture failed");
+            extractedCharge = budget->used() - baseline - sizeof(ldap::FormatResult);
             extracted = std::move(shortResult.text);
         }
-        require(extracted == "(a=)" && budget->used() == baseline + extracted.capacity() + 1,
+        require(extracted && *extracted == "(a=)" && budget->used() == baseline + extractedCharge,
             "Extracted short text lost its allocation or budget metadata charge");
     }
     require(budget->used() == baseline, "Extracted short text leaked storage");
     resultMoveAssignments(
         [](std::string_view input, ldap::FormatOptions opts) { return ldap::formatFilter(input, opts); },
-        [](const ldap::FormatResult& result) { return std::string_view{result.text}; });
+        [](const ldap::FormatResult& result) { return std::string_view{result.textView()}; });
     resultMoveAssignments(
         [](std::string_view input, ldap::FormatOptions opts) { return ldap::parseSimpleEquality(input, opts); },
-        [](const ldap::ParseResult& result) { return std::string_view{result.compact}; });
+        [](const ldap::ParseResult& result) { return std::string_view{result.compactView()}; });
     {
         const std::string_view source{"(cn=x)"};
         auto foreignBudget{std::make_shared<ldap::CoreBudget>()};
@@ -375,9 +468,9 @@ void quotasAndCancellation() {
             options.inputReservation = reservation;
             const auto formattedResult{ldap::formatFilter(source, options)};
             const auto parsedResult{ldap::parseSimpleEquality(source, options)};
-            require(!formattedResult.ok() && formattedResult.text.empty()
+            require(!formattedResult.ok() && formattedResult.textView().empty()
                 && formattedResult.error->code == LdapErrorCode::MemoryExceeded
-                && !parsedResult.ok() && parsedResult.compact.empty()
+                && !parsedResult.ok() && parsedResult.compactView().empty()
                 && parsedResult.error->code == LdapErrorCode::MemoryExceeded,
                 "Foreign/undersized reservation was not rejected by both public operations");
             require(budget->used() == localCharge && foreignBudget->used() == foreignCharge
@@ -392,37 +485,37 @@ void quotasAndCancellation() {
     {
         failNextAllocation.store(true);
         const auto result{ldap::formatFilter("(cn=x)")};
-        require(!failNextAllocation.load() && !result.ok() && result.text.empty()
+        require(!failNextAllocation.load() && !result.ok() && result.textView().empty()
             && result.error->code == LdapErrorCode::ResourceFailure,
             "System failure creating default budget was conflated with quota exhaustion");
         failNextAllocation.store(true);
         const auto parsed{ldap::parseSimpleEquality("(cn=x)")};
-        require(!failNextAllocation.load() && !parsed.ok() && parsed.compact.empty()
+        require(!failNextAllocation.load() && !parsed.ok() && parsed.compactView().empty()
             && parsed.error->code == LdapErrorCode::ResourceFailure,
             "Simple parser default-budget allocation failure was not ResourceFailure");
         auto faultOptions{options};
         faultOptions.checkpoint = failAtCount;
         const auto outputFailure{ldap::formatFilter("(cn=x)", faultOptions)};
-        require(!failNextAllocation.load() && !outputFailure.ok() && outputFailure.text.empty()
+        require(!failNextAllocation.load() && !outputFailure.ok() && outputFailure.textView().empty()
             && outputFailure.error->code == LdapErrorCode::ResourceFailure
             && budget->used() == baseline, "System output allocation failure leaked budget or had wrong error");
     }
     {
         const auto syntax{ldap::formatFilter("(&(cn=x)", options)};
-        require(!syntax.ok() && syntax.text.empty(), "Shared-budget syntax failure produced output");
+        require(!syntax.ok() && syntax.textView().empty(), "Shared-budget syntax failure produced output");
     }
     require(budget->used() == baseline, "Syntax failure leaked reservations");
     {
         const auto outputError{ldap::formatFilter(prettyOverflow,
             {ldap::OutputMode::Pretty, ldap::Eol::CrLf, {}, budget})};
-        require(!outputError.ok() && outputError.text.empty()
+        require(!outputError.ok() && outputError.textView().empty()
             && outputError.error->code == LdapErrorCode::OutputTooLarge,
             "Shared-budget output overflow produced text");
     }
     require(budget->used() == baseline, "Output overflow leaked reservations");
     {
         const auto result{ldap::formatFilter(dense, options)};
-        require(result.ok() && result.text == dense, "Dense leaves exhausted memory or changed bytes");
+        require(result.ok() && result.textView() == dense, "Dense leaves exhausted memory or changed bytes");
         require(budget->used() <= ldap::MaxCoreBytes, "Memory quota exceeded");
     }
     {
@@ -430,7 +523,7 @@ void quotasAndCancellation() {
         require(occupied.has_value() && !budget->reserve(1), "Budget inclusive maximum failed");
         require(budget->peak() == ldap::MaxCoreBytes, "Peak missed inclusive limit or changed on rejection");
         const auto result{ldap::formatFilter("(cn=x)", options)};
-        require(!result.ok() && result.text.empty() && result.error->code == LdapErrorCode::MemoryExceeded,
+        require(!result.ok() && result.textView().empty() && result.error->code == LdapErrorCode::MemoryExceeded,
             "Exhausted budget did not return typed memory error");
         require(budget->used() == ldap::MaxCoreBytes, "Failure leaked/released external reservation");
     }
@@ -439,7 +532,7 @@ void quotasAndCancellation() {
     {
         auto occupied{budget->reserve(ldap::MaxCoreBytes - maximum.size() - 8192)};
         const auto result{ldap::formatFilter(maximum, options)};
-        require(!result.ok() && result.text.empty() && result.error->code == LdapErrorCode::MemoryExceeded,
+        require(!result.ok() && result.textView().empty() && result.error->code == LdapErrorCode::MemoryExceeded,
             "Output allocation escaped shared budget");
         require(budget->used() == baseline + occupied->bytes(), "Failed allocation leaked reservations");
     }
@@ -500,7 +593,7 @@ void quotasAndCancellation() {
         options.checkpointContext = &signal;
         const auto result{ldap::formatFilter(source, options)};
         if (!signal.observed) { std::cerr << "Unobserved phase: " << static_cast<int>(phase) << '\n'; }
-        require(signal.observed && !result.ok() && result.text.empty()
+        require(signal.observed && !result.ok() && result.textView().empty()
             && result.error->code == LdapErrorCode::Cancelled && result.error->offset <= source.size()
             && (phase != ldap::CorePhase::Copy || result.error->offset == 1025),
             "Controlled cancellation phase failed");
@@ -513,7 +606,7 @@ void quotasAndCancellation() {
         options.stop = nestedSignal.source.get_token();
         options.checkpointContext = &nestedSignal;
         const auto result{ldap::formatFilter(nested, options)};
-        require(nestedSignal.observed && !result.ok() && result.text.empty()
+        require(nestedSignal.observed && !result.ok() && result.textView().empty()
             && result.error->code == LdapErrorCode::Cancelled
             && result.error->offset == leafBegin + 1024 && budget->used() == baseline,
             "Nested leaf copy lost source offset or leaked reservations");
@@ -522,7 +615,7 @@ void quotasAndCancellation() {
     options.stop = simpleSignal.source.get_token();
     options.checkpointContext = &simpleSignal;
     const auto simple{ldap::parseSimpleEquality(maximum, options)};
-    require(simpleSignal.observed && !simple.ok() && simple.compact.empty()
+    require(simpleSignal.observed && !simple.ok() && simple.compactView().empty()
         && simple.error->code == LdapErrorCode::Cancelled && simple.error->offset == 1024
         && budget->used() == baseline,
         "Simple equality cancellation leaked or produced output");
@@ -541,6 +634,8 @@ void quotasAndCancellation() {
 } // namespace
 
 int main() {
+    allocatorLifecycle();
+    outputAllocationFailures();
     conformanceProperties();
     quotasAndCancellation();
     using ldap::LdapErrorCode;
@@ -656,7 +751,7 @@ int main() {
     formatInvalid("\v(cn=x)", LdapErrorCode::InvalidSyntax, 0);
     formatInvalid(" (cn=x) text ", LdapErrorCode::InvalidSyntax, 8);
     const auto defaultPretty{ldap::formatFilter("(&(cn=a)(sn=b))")};
-    if (!defaultPretty.ok() || defaultPretty.text != "(&\r\n  (cn=a)\r\n  (sn=b)\r\n)") {
+    if (!defaultPretty.ok() || defaultPretty.textView() != "(&\r\n  (cn=a)\r\n  (sn=b)\r\n)") {
         std::cerr << "Default mode must be Pretty with CRLF\n";
         ++failures;
     }
@@ -744,8 +839,8 @@ int main() {
         std::cerr << "Pretty rejected 128 filter levels\n";
         ++failures;
     } else {
-        formatted(maxPretty.text, prettyLf, maxPretty.text);
-        formatted(maxPretty.text, compact, maxDepth);
+        formatted(maxPretty.textView(), prettyLf, maxPretty.textView());
+        formatted(maxPretty.textView(), compact, maxDepth);
     }
     const auto tooDeep{nestedNot(129)};
     formatInvalid(tooDeep, LdapErrorCode::DepthExceeded, 2 * 128);

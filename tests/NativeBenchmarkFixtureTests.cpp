@@ -6,13 +6,13 @@ int main() {
         const auto input{ldap::benchmark::fixture(size)};
         if (input.size() != size || ldap::validateUtf8Bytes(input)) { return 1; }
         const auto canonical{ldap::formatFilter(input, {ldap::OutputMode::Compact})};
-        if (!canonical.ok() || canonical.text == input) { return 1; }
+        if (!canonical.ok() || canonical.textView() == input) { return 1; }
         for (const auto mode : {ldap::OutputMode::Pretty, ldap::OutputMode::Compact}) {
             const auto output{ldap::formatFilter(input, {mode})};
-            if (!output.ok() || output.text.empty() || output.text.size() > ldap::MaxOutputBytes
-                || output.text == input || ldap::validateUtf8Bytes(output.text)) { return 1; }
-            const auto roundtrip{ldap::formatFilter(output.text, {ldap::OutputMode::Compact})};
-            if (!roundtrip.ok() || std::string_view{roundtrip.text} != std::string_view{canonical.text}) { return 1; }
+            if (!output.ok() || output.textView().empty() || output.textView().size() > ldap::MaxOutputBytes
+                || output.textView() == input || ldap::validateUtf8Bytes(output.textView())) { return 1; }
+            const auto roundtrip{ldap::formatFilter(output.textView(), {ldap::OutputMode::Compact})};
+            if (!roundtrip.ok() || roundtrip.textView() != canonical.textView()) { return 1; }
         }
     }
     try { (void)ldap::benchmark::fixture(0); return 1; }

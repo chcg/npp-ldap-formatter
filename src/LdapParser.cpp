@@ -527,12 +527,13 @@ ParseResult parseSimpleEquality(std::string_view input, FormatOptions options) n
         auto validated{parseValidated(input, stop)};
         if (!validated.ok()) { return validated; }
         ParseResult result{operation.resultStorage(sizeof(ParseResult)),
-            BudgetString{BudgetAllocator<char>{operation.budget}}, std::nullopt};
+            std::allocate_shared<BudgetString>(BudgetAllocator<BudgetString>{operation.budget},
+                "", BudgetAllocator<char>{operation.budget}), std::nullopt};
         stop.check(0, true);
         // Force heap ownership so extracting even short text retains its charge.
-        result.compact.reserve(std::max(input.size(), result.compact.capacity() + 1));
+        result.compact->reserve(std::max(input.size(), result.compact->capacity() + 1));
         PhaseGuard copy{stop, CorePhase::Copy};
-        appendCheckedRange(result.compact, input, 0, input.size(), stop);
+        appendCheckedRange(*result.compact, input, 0, input.size(), stop);
         stop.phase = CorePhase::Publish;
         stop.check(input.size(), true);
         return result;
@@ -555,10 +556,11 @@ FormatResult formatFilter(std::string_view input, FormatOptions options) noexcep
         if (count.overflow) { return formatFail(count.overflow->code, count.overflow->offset); }
         stop.check(input.size(), true);
         FormatResult result{operation.resultStorage(sizeof(FormatResult)),
-            BudgetString{BudgetAllocator<char>{operation.budget}}, std::nullopt};
+            std::allocate_shared<BudgetString>(BudgetAllocator<BudgetString>{operation.budget},
+                "", BudgetAllocator<char>{operation.budget}), std::nullopt};
         // Force heap ownership so extracting even short text retains its charge.
-        result.text.reserve(std::max(count.size, result.text.capacity() + 1));
-        Consumer emit{input, options, stop, &result.text};
+        result.text->reserve(std::max(count.size, result.text->capacity() + 1));
+        Consumer emit{input, options, stop, result.text.get()};
         if (const auto bad{scanStructure(input, emit, stop)}; bad) { return formatFail(bad->code, bad->offset); }
         stop.phase = CorePhase::Publish;
         stop.check(input.size(), true);
