@@ -19,16 +19,15 @@ CMakeUserPresets.json
 # BMad ephemeral render cache
 _bmad/render/
 __pycache__/
-.agents/*
-!.agents/skills/
-.agents/skills/*
-!.agents/skills/graphify/
+.agents/
 _bmad/
 _bmad-output/
 *.pyc
 .uv-cache/
 
-# Archivos de contexto y wrappers locales de BMad
+# Contexto, documentación interna y wrappers locales
+AGENTS.md
+docs/
 bmad-prep.cmd
 project-context/
 
