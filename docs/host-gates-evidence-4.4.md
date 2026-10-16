@@ -103,7 +103,7 @@ y conserva el bloqueo de release.
 
 | Criterio | Evidencia reproducible | Resultado y límite |
 |---|---|---|
-| AC-06: Undo/Redo atómico y ámbito intacto | `tests/PluginDllE2ETests.cpp`, DLL de producción, ambas vistas, Pretty/Compact, tres EOL, selección directa/inversa/documento y ambos órdenes de callback | Verificación simulada; `native_callbacks` y `native_undo_selection` pendientes de HITL. |
+| AC-06: Undo/Redo atómico y ámbito intacto | `tests/PluginDllE2ETests.cpp`, DLL de producción, ambas vistas, Pretty/Compact, tres EOL, selección directa/inversa/documento y ambos órdenes de callback | Verificación simulada y aprobación HITL posterior del caso multilinea con un Ctrl+Z, descrita al final. La matriz nativa completa y el orden de callbacks siguen pendientes; no se promueven los gates globales. |
 | Fallo interno de REPLACESEL | Casos fijos 0..2 y regresiones de borrado parcial/excepción interna; comparación exacta de texto, anchor, caret y edición anterior | Recuperación del buffer y selección exigida; historial Redo residual mantiene gate global bloqueado. |
 | AC-07: NFR-002 y ausencia de edición durante análisis | [Benchmark 4.1](benchmarks-ui.md), [datos](benchmarks-ui-results.json), pruebas de cancelación/worker | Evidencia histórica: Compact 1 MiB p95 commit 80.5948 ms y 5 MiB 350.9664 ms incumplen <50 ms. Windows 10 difiere de Windows 11 de referencia; SSD sin verificar y RAM visible inferior a 16 GiB. No se atribuyen esas mediciones al binario modificado en 4.4. Repetición nativa requerida. |
 | AC-08: x86/x64/ARM64 | Matriz final de esta entrega, [límites previos](package-host-validation.md), [CI](ci.md) | Compilación de las tres pasó. CTest x64 7/7; x86 5/7, ABI/E2E Not Run por EXE ausentes. ARM64 sólo cruzado y GitHub sin ejecutar. Gate global bloqueado. |
@@ -138,7 +138,9 @@ confirma su ausencia; no se atribuye causa ni se declara ABI x86 aprobada.
 
 ## HITL para Notepad++ nativo
 
-Estado: **pendiente; release bloqueada**. Usar Notepad++ 8.9.8.1 y Scintilla 5.6.6
+Estado del protocolo completo: **pendiente; release bloqueada**. Existe una
+aprobación parcial posterior para multilinea y un Undo, registrada abajo.
+Usar Notepad++ 8.9.8.1 y Scintilla 5.6.6
 con DLL de arquitectura coincidente, perfil portátil aislado y fixtures sintéticos
 únicamente en RAM. Registrar versión/SO/arquitectura, revisión y SHA-256/tamaño PE
 de host, DLL y harness. Los hashes corresponden a binarios, nunca al documento.
@@ -165,3 +167,26 @@ de host, DLL y harness. Los hashes corresponden a binarios, nunca al documento.
    igualdades y metadatos binarios.
 
 Aceptación humana: no realizada en 4.4. Ninguna fila pendiente equivale a passed.
+
+## Aprobación HITL posterior: multilinea y Undo atómico
+
+Registro: **2026-10-15**. Fuente: confirmación explícita del usuario en esta
+sesión, tras probar en **Notepad++ nativo** la revisión
+`054dec0f551496d53c1ffca4f7eb163a6ba5071b`. Es evidencia humana reportada;
+el agente no observó ni repitió esa ejecución.
+
+| Comprobación reportada | Resultado |
+|---|---|
+| Formateo de una aserción simple segmentada en varias líneas | **Aprobado**: salida limpia, sin cuadro de error modal. |
+| Compact de la entrada multilinea | **Aprobado**: una línea continua correcta. |
+| Reversión del formateo mediante Ctrl+Z | **Aprobado**: exactamente un paso atómico; selección y caret sin alteraciones reportadas. |
+
+No se conserva el filtro, el valor de búsqueda ni contenido del documento.
+La versión del host, SO, arquitectura y hash de la DLL utilizada no fueron
+aportados; no se atribuyen a esta ejecución los hashes históricos de 4.4 ni
+los de otro build local.
+
+Esta aceptación cubre sólo las tres comprobaciones anteriores. No acredita
+Redo consecutivo, ambas vistas y orientaciones, orden nativo de callbacks,
+inyección de fallos internos, hosts x86/ARM64, CI, rendimiento ni privacidad
+dinámica. **La decisión global de release permanece bloqueada.**
