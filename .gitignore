@@ -11,8 +11,10 @@ build*/
 
 # Tooling and VS caches
 .vs/
+.vscode/
 CMakeCache.txt
 CMakeFiles/
+CMakeUserPresets.json
 
 # BMad ephemeral render cache
 _bmad/render/
@@ -35,4 +37,17 @@ graphify-out/
 
 # Codex configuration and session artifacts stay local.
 .codex/
-.agents/
+
+# Windows device names cannot be used as regular repository paths.
+[nN][uU][lL]
+[nN][uU][lL].*
+[cC][oO][nN]
+[cC][oO][nN].*
+[pP][rR][nN]
+[pP][rR][nN].*
+[aA][uU][xX]
+[aA][uU][xX].*
+[cC][oO][mM][1-9]
+[cC][oO][mM][1-9].*
+[lL][pP][tT][1-9]
+[lL][pP][tT][1-9].*
