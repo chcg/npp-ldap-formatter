@@ -36,8 +36,13 @@ def validate_summary(value: dict) -> None:
             raise ValueError("Unexpected fault observation fields")
         if type(fault["case"]) is not int or fault["case"] != index or any(type(fault[key]) is not bool for key in ("text_equal", "selection_equal", "history_equal")):
             raise ValueError("Invalid fault observation")
-        if any(type(fault[key]) is not int or fault[key] < 0 for key in ("replacements", "undo_calls")) or fault["replacements"] > 1 or fault["undo_calls"] != 0:
+        if any(type(fault[key]) is not int or fault[key] < 0 for key in ("replacements", "undo_calls")) or fault["replacements"] > 1 or fault["undo_calls"] > 1:
             raise ValueError("Unsafe recovery observed")
+        if fault["undo_calls"] and (index not in (1, 2) or fault["replacements"] != 1
+                                    or not fault["text_equal"] or not fault["selection_equal"]):
+            raise ValueError("Unsafe recovery observed")
+        if index in (1, 2) and fault["text_equal"] and fault["selection_equal"] and fault["undo_calls"] != 1:
+            raise ValueError("Restored replacement requires one compensating Undo")
         losses += not all(fault[key] for key in ("text_equal", "selection_equal", "history_equal"))
     if losses != value["integrity_loss_cases"]:
         raise ValueError("Integrity counter disagrees with measured equalities")

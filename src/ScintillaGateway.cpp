@@ -15,6 +15,16 @@ void ScintillaUndoGuard::close() noexcept {
     opened_ = false;
     (void)SendMessageW(view_, SCI_ENDUNDOACTION, 0, 0);
 }
+bool ScintillaUndoGuard::rollback(sptr_t document, sptr_t cursor) noexcept {
+    close();
+    if (SendMessageW(view_, SCI_GETSTATUS, 0, 0) != SC_STATUS_OK
+        || SendMessageW(view_, SCI_GETUNDOSEQUENCE, 0, 0) != 0
+        || SendMessageW(view_, SCI_GETDOCPOINTER, 0, 0) != document
+        || SendMessageW(view_, SCI_GETUNDOCURRENT, 0, 0) != cursor
+        || SendMessageW(view_, SCI_GETSTATUS, 0, 0) != SC_STATUS_OK) { return false; }
+    (void)SendMessageW(view_, SCI_UNDO, 0, 0);
+    return SendMessageW(view_, SCI_GETSTATUS, 0, 0) == SC_STATUS_OK;
+}
 void ScintillaGateway::initialize(NppData data) noexcept { data_ = data; uiThread_ = GetCurrentThreadId(); }
 void ScintillaGateway::reset() noexcept { data_ = NppData{}; uiThread_ = 0; }
 const NppData& ScintillaGateway::host() const noexcept { return data_; }
@@ -178,6 +188,11 @@ CommitResult ScintillaGateway::commit(const ScintillaSnapshot& snapshot, std::st
         std::copy(output.begin(), output.end(), terminated.begin());
         std::vector<char> after(output.size() + 1, '\x7f');
         (void)q(SCI_SETSTATUS, SC_STATUS_OK);
+        const auto initialCursor{q(SCI_GETUNDOCURRENT)};
+        if (initialCursor < 0 || q(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::Api); }
+        if (q(SCI_GETUNDOSEQUENCE) != 0 || q(SCI_GETSTATUS) != SC_STATUS_OK) {
+            return fail(CaptureErrorCode::UnsupportedState);
+        }
         ScintillaUndoGuard undo{m.view};
         if (!undo.opened() || q(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::Api); }
         if (!matches()) { return fail(CaptureErrorCode::DocumentChanged); }
@@ -214,9 +229,45 @@ CommitResult ScintillaGateway::commit(const ScintillaSnapshot& snapshot, std::st
                 return fail(CaptureErrorCode::CommitIndeterminate);
             }
         }
+        const auto replacementCursor{q(SCI_GETUNDOCURRENT)};
+        if (replacementCursor < initialCursor || q(SCI_GETUNDOSEQUENCE) != 1 || q(SCI_GETSTATUS) != SC_STATUS_OK) {
+            return fail(CaptureErrorCode::CommitIndeterminate);
+        }
         mutated = true;
         (void)q(SCI_REPLACESEL, 0, reinterpret_cast<sptr_t>(terminated.data()));
-        if (q(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::CommitIndeterminate); }
+        if (q(SCI_GETSTATUS) != SC_STATUS_OK) {
+            // Only the just-issued replacement may be compensated. An early
+            // error with no new action must never undo the preceding edit.
+            (void)q(SCI_SETSTATUS, SC_STATUS_OK);
+            const auto failedIdentity{identity()};
+            const auto failedCursor{q(SCI_GETUNDOCURRENT)}, failedActions{q(SCI_GETUNDOACTIONS)};
+            const auto ownsDocument = [&](const std::optional<SnapshotMetadata>& value) {
+                return value && value->view == m.view && value->buffer == m.buffer && value->document == m.document
+                    && value->codepage == m.codepage && value->eol == m.eol;
+            };
+            if (!ownsDocument(failedIdentity) || failedCursor < replacementCursor || failedActions < failedCursor
+                || q(SCI_GETSTATUS) != SC_STATUS_OK) { return fail(CaptureErrorCode::CommitIndeterminate); }
+            undo.close();
+            if (q(SCI_GETSTATUS) != SC_STATUS_OK || q(SCI_GETUNDOSEQUENCE) != 0 || q(SCI_GETSTATUS) != SC_STATUS_OK
+                || !ownsDocument(identity()) || q(SCI_GETUNDOCURRENT) != failedCursor
+                || q(SCI_GETUNDOACTIONS) != failedActions || q(SCI_GETSTATUS) != SC_STATUS_OK) {
+                return fail(CaptureErrorCode::CommitIndeterminate);
+            }
+            if (failedCursor > replacementCursor && !undo.rollback(m.document, failedCursor)) {
+                return fail(CaptureErrorCode::CommitIndeterminate);
+            }
+            if (q(SCI_GETUNDOCURRENT) != (failedCursor > replacementCursor ? initialCursor : replacementCursor)
+                || !ownsDocument(identity()) || q(SCI_GETLENGTH) != m.length
+                || !read(m.begin, m.end, before) || std::string_view{before.data(), oldSize} != snapshot.text()) {
+                return fail(CaptureErrorCode::CommitIndeterminate);
+            }
+            (void)q(SCI_SETSEL, static_cast<uptr_t>(m.anchor), m.caret);
+            const auto selectionStatus{q(SCI_GETSTATUS)};
+            auto restored{identity()};
+            if (restored && m.anchor == m.caret) { restored->begin = 0; restored->end = restored->length; }
+            if (selectionStatus != SC_STATUS_OK || restored != m) { return fail(CaptureErrorCode::CommitIndeterminate); }
+            return fail(CaptureErrorCode::CommitIndeterminate);
+        }
         const auto postIdentity{identity()};
         if (!postIdentity || postIdentity->view != m.view || postIdentity->buffer != m.buffer
             || postIdentity->document != m.document || postIdentity->length != postLength

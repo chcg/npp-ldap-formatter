@@ -51,6 +51,7 @@ public:
     ScintillaUndoGuard(const ScintillaUndoGuard&) = delete;
     ScintillaUndoGuard& operator=(const ScintillaUndoGuard&) = delete;
     void close() noexcept;
+    [[nodiscard]] bool rollback(sptr_t document, sptr_t cursor) noexcept;
     [[nodiscard]] bool opened() const noexcept { return opened_; }
 private:
     HWND view_{};

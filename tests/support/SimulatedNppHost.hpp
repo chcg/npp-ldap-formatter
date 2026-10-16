@@ -5,6 +5,7 @@
 #include <array>
 #include <cstring>
 #include <functional>
+#include <new>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -18,6 +19,7 @@ struct Image {
 struct Action {
     Image before{}, after{};
     int token{};
+    bool content{true};
     bool operator==(const Action&) const = default;
 };
 struct Document {
@@ -28,7 +30,8 @@ struct Document {
     bool readonly{}, collect{true}, virtualSpace{}, badCount{}, badNul{}, nullDocument{};
     sptr_t status{};
     std::size_t begins{}, ends{}, replacements{}, undoCalls{}, sets{}, reads{};
-    bool group{}, recorded{}, containerFirst{}, earlyFailure{}, lateFailure{}, deleteFailure{}, selectionFailure{}, tokenFailure{};
+    std::size_t groupDepth{};
+    bool group{}, recorded{}, containerFirst{}, earlyFailure{}, lateFailure{}, deleteFailure{}, deleteException{}, undoFailure{}, selectionFailure{}, tokenFailure{};
     Image groupBefore{};
     int token{};
     std::function<void()> onBegin{}, onToken{}, onSelect{}, onEnd{}, onRead{};
@@ -116,8 +119,16 @@ private:
         case SCI_GETSELECTIONMODE: return d.mode;
         case SCI_GETSELECTIONNANCHORVIRTUALSPACE:
         case SCI_GETSELECTIONNCARETVIRTUALSPACE: return d.virtualSpace;
-        case SCI_GETUNDOACTIONS: return static_cast<LRESULT>(d.history.size());
-        case SCI_GETUNDOCURRENT: return static_cast<LRESULT>(d.cursor);
+        case SCI_GETUNDOACTIONS:
+        case SCI_GETUNDOCURRENT: {
+            LRESULT actions{};
+            const auto end{message == SCI_GETUNDOACTIONS ? d.history.size() : d.cursor};
+            for (std::size_t i{}; i != end; ++i) {
+                actions += (d.history[i].token ? 1 : 0) + (d.history[i].content ? 1 : 0);
+            }
+            return actions;
+        }
+        case SCI_GETUNDOSEQUENCE: return static_cast<LRESULT>(d.groupDepth);
         case SCI_GETTEXTRANGEFULL: {
             auto& range{*reinterpret_cast<Sci_TextRangeFull*>(l)};
             if (range.chrg.cpMin < 0 || range.chrg.cpMax < range.chrg.cpMin || static_cast<uptr_t>(range.chrg.cpMax) > d.image.bytes.size()) {
@@ -137,33 +148,56 @@ private:
                 output[count] = d.badNul ? 'x' : '\0'; ++d.reads; callback(d.onRead); }
             return static_cast<LRESULT>(count) + (d.badCount ? 1 : 0);
         }
-        case SCI_BEGINUNDOACTION: ++d.begins; d.group = true; d.recorded = false; d.groupBefore = d.image; d.token = 0; callback(d.onBegin); return 0;
-        case SCI_ADDUNDOACTION: d.token = static_cast<int>(w); if (d.tokenFailure) { d.status = SC_STATUS_FAILURE; } callback(d.onToken); return 0;
+        case SCI_BEGINUNDOACTION:
+            ++d.begins;
+            if (d.groupDepth++ == 0) { d.group = true; d.recorded = false; d.groupBefore = d.image; d.token = 0; }
+            callback(d.onBegin); return 0;
+        case SCI_ADDUNDOACTION:
+            d.token = static_cast<int>(w);
+            d.history.resize(d.cursor);
+            d.history.push_back({d.group ? d.groupBefore : d.image, d.image, d.token, false});
+            ++d.cursor; d.recorded = true;
+            if (d.tokenFailure) { d.status = SC_STATUS_FAILURE; } callback(d.onToken); return 0;
         case SCI_SETSEL: ++d.sets; d.image.anchor = static_cast<Sci_Position>(w); d.image.caret = l;
             callback(d.onSelect); if (d.selectionFailure) { d.status = SC_STATUS_FAILURE; } return 0;
         case SCI_ENDUNDOACTION:
             ++d.ends; callback(d.onEnd);
-            if (d.recorded) { d.history.back().after = d.image; }
-            d.group = false; return 0;
+            if (d.groupDepth && --d.groupDepth == 0) {
+                if (d.recorded) { d.history.back().after = d.image; }
+                d.group = false;
+            }
+            return 0;
         case SCI_REPLACESEL: {
             ++d.replacements;
             if (d.earlyFailure) { d.status = SC_STATUS_FAILURE; return 0; }
             const auto begin{std::min(d.image.anchor, d.image.caret)};
             const auto length{std::max(d.image.anchor, d.image.caret) - begin};
             if (begin < 0 || length < 0 || static_cast<uptr_t>(begin + length) > d.image.bytes.size()) { d.status = SC_STATUS_FAILURE; return 0; }
-            d.history.resize(d.cursor);
-            d.history.push_back({d.group ? d.groupBefore : d.image, {}, d.token}); ++d.cursor; d.recorded = true;
-            d.image.bytes.replace(static_cast<std::size_t>(begin), static_cast<std::size_t>(length), d.deleteFailure ? "" : reinterpret_cast<const char*>(l));
-            d.image.anchor = d.image.caret = begin + (d.deleteFailure ? 0 : static_cast<Sci_Position>(std::strlen(reinterpret_cast<const char*>(l))));
+            if (d.group && d.recorded) { d.history.back().content = true; }
+            else {
+                d.history.resize(d.cursor);
+                d.history.push_back({d.group ? d.groupBefore : d.image, {}, d.token}); ++d.cursor; d.recorded = true;
+            }
+            d.image.bytes.replace(static_cast<std::size_t>(begin), static_cast<std::size_t>(length), d.deleteFailure || d.deleteException ? "" : reinterpret_cast<const char*>(l));
+            d.image.anchor = d.image.caret = begin + (d.deleteFailure || d.deleteException ? 0 : static_cast<Sci_Position>(std::strlen(reinterpret_cast<const char*>(l))));
             d.history.back().after = d.image;
+            // Scintilla contains internal exceptions; none crosses the Win32 callback.
+            try { if (d.deleteException) { throw std::bad_alloc{}; } }
+            catch (...) { d.status = SC_STATUS_FAILURE; return 0; }
             if (d.lateFailure || d.deleteFailure) { d.status = SC_STATUS_FAILURE; } return 0;
         }
         case SCI_UNDO:
         case SCI_REDO: {
             const bool undo{message == SCI_UNDO}; ++d.undoCalls;
+            if (d.undoFailure) { d.status = SC_STATUS_FAILURE; return 0; }
             if ((undo && !d.cursor) || (!undo && d.cursor == d.history.size())) { return 0; }
             const auto action{d.history[undo ? d.cursor - 1 : d.cursor]};
             const auto send = [&](int flags, int token) { notification(SCN_MODIFIED, window, flags | (undo ? SC_PERFORMED_UNDO : SC_PERFORMED_REDO), token); };
+            if (!action.content) {
+                if (undo) { --d.cursor; } else { ++d.cursor; }
+                if (action.token) { send(SC_MOD_CONTAINER | SC_LASTSTEPINUNDOREDO, action.token); }
+                return 0;
+            }
             if (d.containerFirst && action.token) { send(SC_MOD_CONTAINER, action.token); }
             d.image.bytes = undo ? action.before.bytes : action.after.bytes;
             if (undo) { --d.cursor; } else { ++d.cursor; }

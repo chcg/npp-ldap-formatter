@@ -142,6 +142,8 @@ int wmain(int argc, wchar_t* argv[]) {
             check(host.documents[static_cast<std::size_t>(1 - view)].image == inactive);
             host.undo(static_cast<std::size_t>(view)); check(d.image == original && d.cursor == 1);
             host.undo(static_cast<std::size_t>(view), true); check(d.image == expected && d.cursor == 2);
+            host.undo(static_cast<std::size_t>(view)); check(d.image == original && d.cursor == 1);
+            host.undo(static_cast<std::size_t>(view), true); check(d.image == expected && d.cursor == 2);
             host.undo(static_cast<std::size_t>(view)); host.undo(static_cast<std::size_t>(view)); check(d.image.bytes == previous.bytes && d.cursor == 0);
             ++cases;
           } } }
@@ -209,13 +211,90 @@ int wmain(int argc, wchar_t* argv[]) {
             const bool textEqual{d.image.bytes == original.bytes}, selectionEqual{d.image.anchor == original.anchor && d.image.caret == original.caret}, historyEqual{d.history == history};
             faults[static_cast<std::size_t>(fault)] = {textEqual, selectionEqual, historyEqual, d.replacements, d.undoCalls};
             if (!textEqual || !selectionEqual || !historyEqual) { ++integrityLoss; }
-            if (fault == 0) { check(textEqual); }
-            check(d.replacements <= 1 && d.undoCalls == 0 && d.begins == d.ends);
+            if (fault <= 2) { check(textEqual && selectionEqual); }
+            const std::size_t expectedUndos{fault == 1 || fault == 2 ? 1U : 0U};
+            check(d.replacements <= 1 && d.undoCalls == expectedUndos && d.begins == d.ends);
             const auto blocked{d.image}; const auto blockedHistory{d.history}; const auto replacements{d.replacements};
             commands[0]._pFunc(); e2e::SimulatedNppHost::drain();
-            check(d.image == blocked && d.history == blockedHistory && d.replacements == replacements && d.undoCalls == 0);
+            check(d.image == blocked && d.history == blockedHistory && d.replacements == replacements && d.undoCalls == expectedUndos);
             ++cases; ++containment;
         }
+        // Partial deletion, including an internal exception, must preserve the
+        // selection orientation and leave the preceding independent edit intact.
+        for (const bool reverse : {false, true}) { for (const bool exception : {false, true}) {
+            host.documents = {}; host.active = 0; auto& d{host.documents[0]};
+            const Sci_Position begin{4}, end{begin + static_cast<Sci_Position>(input.size())};
+            d.image = {"pre " + input + " post", reverse ? end : begin, reverse ? begin : end};
+            const auto original{d.image}; const e2e::Image previous{"independent edit", 0, 0};
+            d.history.push_back({previous, original, 0}); d.cursor = 1;
+            d.deleteFailure = !exception; d.deleteException = exception;
+            Session session{host, info, notify}; commands[1]._pFunc();
+            check(e2e::SimulatedNppHost::pumpUntil([&] { return d.ends == 1; }));
+            check(d.image == original && d.undoCalls == 1 && d.cursor == 1
+                && d.history.front() == e2e::Action{previous, original, 0} && d.begins == d.ends);
+            ++cases;
+        } }
+        for (int failure{}; failure != 5; ++failure) {
+            host.documents = {}; host.active = 0; auto& d{host.documents[0]};
+            d.image = {input, 3, 3}; const auto original{d.image};
+            const e2e::Image previous{"independent edit", 0, 0};
+            d.history.push_back({previous, original, 0}); d.cursor = 1;
+            if (failure == 0) { d.earlyFailure = true; }
+            else { d.deleteFailure = true; }
+            if (failure == 1) { d.onEnd = [&] { d.nullDocument = true; }; }
+            if (failure == 2) { d.undoFailure = true; }
+            if (failure == 3) { d.onEnd = [&] { d.status = SC_STATUS_FAILURE; }; }
+            if (failure == 4) { d.onEnd = [&] { SendMessageW(host.views[0], SCI_BEGINUNDOACTION, 0, 0); }; }
+            Session session{host, info, notify}; commands[1]._pFunc();
+            check(e2e::SimulatedNppHost::pumpUntil([&] { return d.ends == 1; }));
+            check(d.history.front() == e2e::Action{previous, original, 0}
+                && d.cursor == 2 && d.undoCalls == (failure == 2 ? 1U : 0U));
+            if (failure == 0) { check(d.image == original); }
+            else { check(d.image.bytes.empty()); }
+            ++cases;
+        }
+        // Reject a host-owned group before inserting a token or changing selection.
+        { host.documents = {}; host.active = 0; auto& d{host.documents[0]};
+          d.image = {input, 3, 3}; const auto original{d.image};
+          d.history.push_back({{"independent edit", 0, 0}, original, 0}); d.cursor = 1;
+          const auto history{d.history}; Session session{host, info, notify};
+          SendMessageW(host.views[0], SCI_BEGINUNDOACTION, 0, 0);
+          const auto notices{observation.count}; commands[1]._pFunc();
+          check(e2e::SimulatedNppHost::pumpUntil([&] { return observation.count > notices; }));
+          check(d.image == original && d.history == history && d.cursor == 1 && d.replacements == 0
+              && d.undoCalls == 0 && d.begins == 1 && d.ends == 0 && d.groupDepth == 1
+              && observation.diagnostic.find(L"[UnsupportedState]") != std::wstring::npos);
+          SendMessageW(host.views[0], SCI_ENDUNDOACTION, 0, 0); ++cases; }
+        // A token is its own raw action even if replacement fails before editing;
+        // inserting it drops an existing Redo tail, which cannot be recovered.
+        { host.documents = {}; host.active = 0; auto& d{host.documents[0]};
+          d.image = {input, 3, 3}; const auto original{d.image};
+          const e2e::Action previous{{"independent edit", 0, 0}, original, 0};
+          d.history = {previous, {original, {"old Redo", 0, 0}, 0}}; d.cursor = 1; d.earlyFailure = true;
+          Session session{host, info, notify}; commands[1]._pFunc();
+          check(e2e::SimulatedNppHost::pumpUntil([&] { return d.ends == 1; }));
+          check(d.image == original && d.cursor == 2 && d.history.size() == 2 && d.history.front() == previous
+              && d.history.back().token > 0 && !d.history.back().content && d.undoCalls == 0
+              && SendMessageW(host.views[0], SCI_GETUNDOCURRENT, 0, 0) == 2);
+          host.undo(0); check(d.image == original && d.cursor == 1);
+          host.undo(0, true); check(d.image == original && d.cursor == 2); ++cases; }
+        // Two distinct format commands retain their own before/after selection.
+        for (const bool reverse : {false, true}) { for (const bool first : {false, true}) {
+            host.documents = {}; host.active = 0; auto& d{host.documents[0]}; d.containerFirst = first;
+            const Sci_Position begin{4}, end{begin + static_cast<Sci_Position>(input.size())};
+            d.image = {"pre " + input + " post", reverse ? end : begin, reverse ? begin : end};
+            const auto original{d.image}; Session session{host, info, notify};
+            commands[0]._pFunc(); check(e2e::SimulatedNppHost::pumpUntil([&] { return d.ends == 1; }));
+            const auto pretty{d.image};
+            commands[1]._pFunc(); check(e2e::SimulatedNppHost::pumpUntil([&] { return d.ends == 2; }));
+            const auto compactImage{d.image};
+            check(compactImage.bytes == "pre " + compact + " post");
+            host.undo(0); check(d.image == pretty && d.cursor == 1);
+            host.undo(0); check(d.image == original && d.cursor == 0);
+            host.undo(0, true); check(d.image == pretty && d.cursor == 1);
+            host.undo(0, true); check(d.image == compactImage && d.cursor == 2);
+            ++cases;
+        } }
         // Cancellation uses production worker scheduling; no internal test ABI.
         for (int stale{}; stale != 3; ++stale) {
             host.documents = {}; host.active = 0; auto& d{host.documents[0]};

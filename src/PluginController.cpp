@@ -167,7 +167,11 @@ void PluginController::processDelivery(FormatDelivery& delivery) noexcept {
                 }
             }
         }
-        if (delivery.generation == generation_) { error_ = committed.error; }
+        if (committed.error && committed.error->code == CaptureErrorCode::CommitIndeterminate) {
+            // A compensating Undo can invalidate the delivery generation while
+            // applying. The current host failure still needs its scoped cause.
+            error_ = committed.error; requested_ = true;
+        } else if (delivery.generation == generation_) { error_ = committed.error; }
     }
 }
 std::unique_ptr<FormatDelivery> PluginController::takeDelivery() noexcept { poll(); return {}; }

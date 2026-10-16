@@ -171,8 +171,33 @@ class HostEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError): evidence.validate_report(self.report)
 
     def test_faults_cannot_hide_unsafe_recovery(self):
-        for key, value in (("replacements", 2), ("undo_calls", 1)):
-            report = copy.deepcopy(self.report); report["simulated"]["fault_observations"][0][key] = value
+        for index in (0, 3, 4, 5):
+            report = copy.deepcopy(self.report); report["simulated"]["fault_observations"][index]["undo_calls"] = 1
+            with self.assertRaises(ValueError): evidence.validate_report(report)
+        self.report["simulated"]["fault_observations"][0]["replacements"] = 2
+        with self.assertRaises(ValueError): evidence.validate_report(self.report)
+
+    def test_controlled_replace_rollback_keeps_native_pending(self):
+        for index in (1, 2):
+            report = copy.deepcopy(self.report)
+            fault = report["simulated"]["fault_observations"][index]
+            fault.update(text_equal=True, selection_equal=True, history_equal=False, undo_calls=1)
+            evidence.validate_report(report)
+            self.assertEqual(report["gates"]["simulated_preservation"], "failed")
+            self.assertTrue(report["release_blocked"])
+
+    def test_rollback_requires_replacement_and_restored_text_selection(self):
+        for index in range(6):
+            for change in ({"undo_calls": 2}, {"undo_calls": 1, "replacements": 0},
+                           {"undo_calls": 1, "text_equal": False}, {"undo_calls": 1, "selection_equal": False}):
+                report = copy.deepcopy(self.report)
+                report["simulated"]["fault_observations"][index].update(change)
+                with self.assertRaises(ValueError): evidence.validate_report(report)
+
+    def test_restored_replacement_requires_one_undo(self):
+        for index in (1, 2):
+            report = copy.deepcopy(self.report)
+            report["simulated"]["fault_observations"][index].update(text_equal=True, history_equal=False)
             with self.assertRaises(ValueError): evidence.validate_report(report)
 
 

@@ -99,6 +99,7 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM w, LPARAM l) {
         if (state.historyStatusFailure) { state.status = SC_STATUS_FAILURE; }
         return state.undoCountOverride.value_or(static_cast<sptr_t>(state.undoTexts.size() + state.redoTexts.size()));
     case SCI_GETUNDOCURRENT: return state.undoCursorOverride.value_or(static_cast<sptr_t>(state.undoTexts.size()));
+    case SCI_GETUNDOSEQUENCE: return state.undoOpen ? 1 : 0;
     case SCI_ADDUNDOACTION:
         state.pendingToken = static_cast<int>(w); ++state.addedTokens;
         if (state.addTokenFailure) { state.status = SC_STATUS_FAILURE; }
@@ -511,11 +512,13 @@ int main() {
       check(state.replacements == count && state.begins == begins); }
     for (int fault{}; fault != 2; ++fault) {
       resetCommit(); auto captured{gateway.capture(ldap::OutputMode::Pretty, budget)};
+      const auto originalText{state.text}; const auto anchor{state.anchor}, caret{state.caret};
       state.replaceFailure = fault == 0; state.postFailure = fault == 1;
       const auto count{state.replacements}, begins{state.begins}, ends{state.ends};
       const auto result{gateway.commit(*captured.snapshot, "(&(cn=a)(sn=b))", budget)};
       check(result.error && result.error->code == ldap::CaptureErrorCode::CommitIndeterminate
           && state.replacements == count + 1 && state.begins == begins + 1 && state.ends == ends + 1);
+      if (fault == 0) { check(state.text == originalText && state.anchor == anchor && state.caret == caret); }
       state.replaceFailure = state.postFailure = false;
     }
     // Positive container insertion itself can fail or change the document.

@@ -102,8 +102,15 @@ Las inyecciones se identifican por un índice fijo, sin contenido documental:
 | 5 | Callback de selección cambia contenido y falla la compensación |
 
 Para cada inyección se registra igualdad real de texto, selección e historial,
-reemplazos y llamadas Undo. Contención exige bloqueo posterior, máximo un intento,
-ningún Undo ciego y balance del grupo. Contención aprobada no equivale a
+reemplazos y llamadas Undo. Desde 4.4, los casos 1 y 2 permiten una única llamada
+Undo controlada del grupo propio tras comprobar identidad e historial, y exigen
+texto y selección restaurados. El caso 0 restaura selección sin deshacer una
+edición anterior. Los casos 3 a 5 no autorizan Undo automático. Contención exige
+bloqueo posterior, máximo un intento, ningún Undo ciego y balance del grupo.
+La recuperación puede dejar una acción Redo: no equivale a historial idéntico.
+Los resultados del 2026-10-14 anteriores son históricos; la evidencia actual está
+en [host-gates-evidence-4.4.md](host-gates-evidence-4.4.md).
+Contención aprobada no equivale a
 preservación: cualquier desigualdad deja `simulated_preservation=failed` y release
 bloqueado. Incluso un fallo temprano puede conservar bytes y perder selección.
 
@@ -125,7 +132,10 @@ en la otra vista. Repetir activación, cierre y selección mientras el worker co
 
 Para preservación ante fallo interno, instrumentar exclusivamente una instancia
 de prueba del host para provocar error antes y después de sus efectos. Registrar
-las tres igualdades, número de reemplazos, bloqueo y ausencia de Undo automático;
+las tres igualdades, número de reemplazos, bloqueo y número de Undo automáticos;
+para el fallo de reemplazo propio exigir exactamente uno tras el borrado y cero
+cuando no hay una acción de contenido propia que deshacer. Comprobar que la
+recuperación nunca deshace una edición independiente anterior;
 no sustituir evidencia por suposiciones de restauración. Si se pierde integridad,
 marcar puerta `failed`, mantener release bloqueado y elevar la discrepancia para
 resolver el requisito. Adjuntar solo metadatos y resultados; no capturas o logs
