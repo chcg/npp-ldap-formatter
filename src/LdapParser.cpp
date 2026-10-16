@@ -129,9 +129,27 @@ struct PhaseGuard {
     return std::nullopt;
 }
 
+[[nodiscard]] constexpr bool structuralSpace(char ch) noexcept {
+    return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
+}
+
+// Returns whether the skipped layout contains a real line break.
+bool skipStructuralSpace(std::string_view input, std::size_t& cursor, Checkpoint& stop) {
+    bool lineBreak{};
+    while (cursor < input.size() && structuralSpace(input[cursor])) {
+        PhaseGuard whitespace{stop, CorePhase::Whitespace};
+        stop.check(cursor);
+        lineBreak = lineBreak || input[cursor] == '\r' || input[cursor] == '\n';
+        ++cursor;
+    }
+    return lineBreak;
+}
+
+using AssertionRanges = std::array<std::pair<std::size_t, std::size_t>, 3>;
 struct LeafResult {
     std::size_t next{};
     std::optional<ParseError> error{};
+    AssertionRanges ranges{};
 };
 
 enum class WildcardPolicy { Allow, InvalidSyntax, UnsupportedFilter };
@@ -204,9 +222,18 @@ void appendCheckedRange(BudgetString& output, std::string_view input,
     if (separator == '(' || separator == ')') {
         return {0, ParseError{LdapErrorCode::InvalidSyntax, cursor}};
     }
-    const bool hasAttribute{cursor != begin};
+    const auto operatorBegin{cursor};
+    auto attributeEnd{cursor};
+    if (separator != ':') {
+        PhaseGuard whitespace{stop, CorePhase::Whitespace};
+        while (attributeEnd > begin && structuralSpace(input[attributeEnd - 1])) {
+            stop.check(attributeEnd - 1);
+            --attributeEnd;
+        }
+    }
+    const bool hasAttribute{attributeEnd != begin};
     if (hasAttribute) {
-        if (const auto bad{validateAttribute(input, begin, cursor, stop)}; bad.has_value()) {
+        if (const auto bad{validateAttribute(input, begin, attributeEnd, stop)}; bad.has_value()) {
             return {0, ParseError{LdapErrorCode::InvalidAttribute, *bad}};
         }
     } else if (separator != ':') {
@@ -280,8 +307,20 @@ void appendCheckedRange(BudgetString& output, std::string_view input,
         cursor += 2;
     }
 
-    return scanAssertionValue(input, cursor,
-        allowWildcard ? WildcardPolicy::Allow : WildcardPolicy::InvalidSyntax, stop);
+    auto leaf{scanAssertionValue(input, cursor,
+        allowWildcard ? WildcardPolicy::Allow : WildcardPolicy::InvalidSyntax, stop)};
+    if (leaf.error) { return leaf; }
+    auto valueBegin{cursor};
+    auto valueEnd{leaf.next - 1};
+    if (separator != ':' && skipStructuralSpace(input, valueBegin, stop)) {
+        PhaseGuard whitespace{stop, CorePhase::Whitespace};
+        while (valueEnd > valueBegin && structuralSpace(input[valueEnd - 1])) {
+            stop.check(valueEnd - 1);
+            --valueEnd;
+        }
+    } else { valueBegin = cursor; }
+    leaf.ranges = {{{begin, attributeEnd}, {operatorBegin, cursor}, {valueBegin, valueEnd}}};
+    return leaf;
 }
 
 [[nodiscard]] LeafResult scanLeaf(std::string_view input, std::size_t open, Checkpoint& stop) {
@@ -336,24 +375,13 @@ struct Event {
     std::size_t begin{};
     std::size_t end{};
     char op{};
+    AssertionRanges ranges{};
 };
 
 struct Frame {
     char op{};
     std::size_t children{};
 };
-
-[[nodiscard]] constexpr bool structuralSpace(char ch) noexcept {
-    return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
-}
-
-void skipStructuralSpace(std::string_view input, std::size_t& cursor, Checkpoint& stop) {
-    while (cursor < input.size() && structuralSpace(input[cursor])) {
-        PhaseGuard whitespace{stop, CorePhase::Whitespace};
-        stop.check(cursor);
-        ++cursor;
-    }
-}
 
 [[nodiscard]] FormatResult formatFail(LdapErrorCode code, std::size_t offset) noexcept {
     return FormatResult{{}, {}, ParseError{code, offset}};
@@ -431,7 +459,7 @@ template<class Consumer>
         }
         const auto leaf{scanAssertionLeaf(input, component, stop)};
         if (leaf.error.has_value()) { return leaf.error; }
-        if (const auto bad{consume(Event{EventKind::Leaf, component, leaf.next, 0})}; bad) { return bad; }
+        if (const auto bad{consume(Event{EventKind::Leaf, component, leaf.next, 0, leaf.ranges})}; bad) { return bad; }
         cursor = leaf.next;
         if (depth == 0) { state = State::Done; }
         else { ++stack[depth - 1].children; state = State::AfterChild; }
@@ -454,8 +482,10 @@ struct Consumer {
         if (event.kind == EventKind::Close) { --depth; }
         const bool indent{options.mode == OutputMode::Pretty
             && (event.kind == EventKind::Close || depth != 0)};
-        const std::size_t content{event.kind == EventKind::Open ? 2
-            : event.kind == EventKind::Close ? 1 : 1 + event.end - event.begin};
+        std::size_t content{event.kind == EventKind::Close ? 1U : 2U};
+        if (event.kind == EventKind::Leaf) {
+            for (const auto& [begin, end] : event.ranges) { content += end - begin; }
+        }
         const std::size_t prefix{indent ? eol.size() + depth * 2 : 0};
         if (!overflow && (prefix > MaxOutputBytes - size
             || content > MaxOutputBytes - size - prefix)) {
@@ -472,7 +502,14 @@ struct Consumer {
                 else if (event.kind == EventKind::Close) { output->push_back(')'); }
                 else {
                     output->push_back('(');
-                    appendCheckedRange(*output, input, event.begin, event.end, stop);
+                    if (content == 1 + event.end - event.begin) {
+                        appendCheckedRange(*output, input, event.begin, event.end, stop);
+                    } else {
+                        for (const auto& [begin, end] : event.ranges) {
+                            appendCheckedRange(*output, input, begin, end, stop);
+                        }
+                        output->push_back(')');
+                    }
                 }
             }
         }

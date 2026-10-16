@@ -90,7 +90,10 @@ struct FormatResult {
 // UTF-8 de toda la entrada se valida antes de diagnosticar la estructura.
 // Presencia/subcadena distinguen '*' crudo de escapes hexadecimales; extensible
 // admite atributo opcional solo cuando hay regla de coincidencia.
-// Ambos modos preservan cada byte de los valores y escapes de las hojas.
+// En assertions simples se elimina SP/HTAB/CR/LF entre atributo y operador.
+// Si el prefijo whitespace del valor contiene CR/LF, se recortan ese prefijo y
+// el whitespace final. Sin ese salto inicial, los espacios del valor se conservan.
+// Ambos modos preservan el contenido interno y escapes; extensibles no se recortan.
 // Los offsets siempre se refieren a la entrada original. No devuelve salida parcial ni lanza.
 [[nodiscard]] FormatResult formatFilter(
     std::string_view input, FormatOptions options = {}) noexcept;

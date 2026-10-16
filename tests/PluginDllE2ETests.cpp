@@ -160,22 +160,24 @@ int wmain(int argc, wchar_t* argv[]) {
         } }
         // Structural and peripheral whitespace in real selections normalizes
         // without changing value whitespace or losing selection orientation.
+        for (const bool multiline : {false, true}) {
         for (int command{}; command != 2; ++command) { for (int direction{}; direction != 3; ++direction) {
             host.documents = {}; host.active = 0; auto& d{host.documents[0]};
-            const std::string selected{" \t\r\n(\r\n\tcn= value ) \n"};
+            const std::string selected{multiline ? " \r\n(\r\ncn \r\n=\r\n value \r\n)\n"
+                                                : " \t\r\n(\r\n\tcn= value ) \n"};
             const bool full{direction == 2}, reverse{direction == 1};
             const Sci_Position begin{full ? 0 : 4}, end{begin + static_cast<Sci_Position>(selected.size())};
             d.image = {full ? selected : "pre " + selected + " post", full ? 3 : reverse ? end : begin, full ? 3 : reverse ? begin : end};
             const auto original{d.image}; const auto notices{observation.count};
             Session session{host, info, notify}; commands[command]._pFunc();
             check(e2e::SimulatedNppHost::pumpUntil([&] { return d.ends == 1; }));
-            const std::string formatted{"(cn= value )"};
+            const std::string formatted{multiline ? "(cn=value)" : "(cn= value )"};
             const auto outputEnd{begin + static_cast<Sci_Position>(formatted.size())};
             const e2e::Image expected{full ? formatted : "pre " + formatted + " post", reverse ? outputEnd : begin, reverse ? begin : outputEnd};
             check(d.image == expected && d.replacements == 1 && observation.count == notices);
             host.undo(0); check(d.image == original);
             host.undo(0, true); check(d.image == expected); ++cases;
-        } }
+        } } }
         // Rejections exercise the real worker and deferred production presenter.
         for (int rejection{}; rejection != 18; ++rejection) {
             host.documents = {}; host.active = 0; auto& d{host.documents[0]};

@@ -136,6 +136,41 @@ std::string nestedNot(std::size_t levels) {
     return input;
 }
 
+void multilineAssertions() {
+    using ldap::LdapErrorCode;
+    const ldap::FormatOptions compact{ldap::OutputMode::Compact};
+    for (const auto newline : {"\r\n", "\n", "\r"}) {
+        for (const auto op : {"=", "~=", ">=", "<="}) {
+            const std::string expected{"(sAMAccountName" + std::string{op} + "exampleuser)"};
+            for (int layout{}; layout != 3; ++layout) {
+                const std::string before{layout != 1 ? " \t" + std::string{newline} : ""};
+                const std::string after{layout != 0 ? " \t" + std::string{newline} + "  " : ""};
+                const std::string tail{layout != 0 ? std::string{newline} + " \t" : ""};
+                const std::string input{"(" + std::string{newline} + "sAMAccountName" + before + op
+                    + after + "exampleuser" + tail + ")"};
+                idempotentModes(input, expected, expected, ldap::Eol::Lf);
+                idempotentModes("(&" + input + "(cn=John Doe))", "(&" + expected + "(cn=John Doe))",
+                    "(&\r\n  " + expected + "\r\n  (cn=John Doe)\r\n)", ldap::Eol::CrLf);
+            }
+        }
+    }
+    formatted("(cn\r\n=\r\n John Doe \r\n)", compact, "(cn=John Doe)");
+    formatted("(cn=\r\n \t)", compact, "(cn=)");
+    formatted("(cn=\n * \n)", compact, "(cn=*)");
+    formatted("(cn = John Doe  )", compact, "(cn= John Doe  )");
+    formatted("(cn=John\r\nDoe )", compact, "(cn=John\r\nDoe )");
+    formatted("(cn=\\0d\\0aJohn Doe\\20)", compact, "(cn=\\0d\\0aJohn Doe\\20)");
+    formatted("(cn=\n \\20John Doe\\20 \n)", compact, "(cn=\\20John Doe\\20)");
+    formatted("(cn:rule:=\r\n value \r\n)", compact, "(cn:rule:=\r\n value \r\n)");
+    formatInvalid("(c n =x)", LdapErrorCode::InvalidAttribute, 2);
+    formatInvalid("(cn~\n=x)", LdapErrorCode::InvalidSyntax, 3);
+    formatInvalid("(cn \n:rule:=x)", LdapErrorCode::InvalidAttribute, 3);
+    formatInvalid("(cn\r\n= \r\n\\GG\n)", LdapErrorCode::InvalidEscape, 9);
+    formatInvalid("(cn\r\n=\r\n\xff)", LdapErrorCode::InvalidUtf8, 8);
+    formatInvalid(std::string{"(cn\r\n=\r\n\0)", 10}, LdapErrorCode::RawNul, 8);
+    formatInvalid("(cn\r\n=\r\nx", LdapErrorCode::UnbalancedParenthesis, 9);
+}
+
 // Oráculo de emisión independiente del parser: las hojas son bytes inmutables.
 struct FilterFixture {
     std::string leaf{};
@@ -393,6 +428,19 @@ void quotasAndCancellation() {
         if (result.ok()) { formatted(result.textView(), {}, result.textView()); }
     }
     const std::string prettyOverflow{"(&(cn=" + std::string(ldap::MaxOutputBytes - 13, 'x') + "))"};
+    const std::string layoutExact{"(&(cn \n=\n" + std::string(ldap::MaxOutputBytes - 14, 'x') + "\n))"};
+    {
+        const auto result{ldap::formatFilter(layoutExact)};
+        require(result.ok() && result.textView().size() == ldap::MaxOutputBytes,
+            "Normalized ranges did not honor exact output quota");
+    }
+    const std::string layoutOverflow{"(&(cn \n=\n" + std::string(ldap::MaxOutputBytes - 13, 'x') + "\n))"};
+    {
+        const auto result{ldap::formatFilter(layoutOverflow)};
+        require(!result.ok() && result.textView().empty()
+            && result.error->code == LdapErrorCode::OutputTooLarge,
+            "Normalized ranges bypassed output quota");
+    }
     formatInvalid(prettyOverflow, LdapErrorCode::OutputTooLarge, prettyOverflow.size() - 1);
     formatted(prettyOverflow, compact, prettyOverflow);
     const ldap::FormatOptions lf{ldap::OutputMode::Pretty, ldap::Eol::Lf};
@@ -611,6 +659,17 @@ void quotasAndCancellation() {
             && result.error->offset == leafBegin + 1024 && budget->used() == baseline,
             "Nested leaf copy lost source offset or leaked reservations");
     }
+    for (const auto& layoutSource : {"(cn" + std::string(8192, ' ') + "=x)",
+             "(cn=\n" + std::string(8192, ' ') + "x)",
+             "(cn=\nvalue" + std::string(8192, ' ') + "\n)"}) {
+        StopAt layoutSignal{{}, ldap::CorePhase::Whitespace, false, 1024};
+        options.stop = layoutSignal.source.get_token();
+        options.checkpointContext = &layoutSignal;
+        const auto result{ldap::formatFilter(layoutSource, options)};
+        require(layoutSignal.observed && !result.ok() && result.textView().empty()
+            && result.error->code == LdapErrorCode::Cancelled && result.error->offset < layoutSource.size()
+            && budget->used() == baseline, "Assertion layout cancellation lost position or budget");
+    }
     StopAt simpleSignal{{}, ldap::CorePhase::Copy, false, 1024};
     options.stop = simpleSignal.source.get_token();
     options.checkpointContext = &simpleSignal;
@@ -634,6 +693,7 @@ void quotasAndCancellation() {
 } // namespace
 
 int main() {
+    multilineAssertions();
     allocatorLifecycle();
     outputAllocationFailures();
     conformanceProperties();
@@ -825,7 +885,7 @@ int main() {
     formatInvalid(std::string{"(&(cn=a\0b))", 11}, LdapErrorCode::RawNul, 7);
     formatted(" (cn=a)", compact, "(cn=a)");
     formatted("(cn=a) ", compact, "(cn=a)");
-    formatInvalid("( cn = foo )", LdapErrorCode::InvalidAttribute, 4);
+    formatted("( cn = foo )", compact, "(cn= foo )");
     formatInvalid("( \t\r\n", LdapErrorCode::UnbalancedParenthesis, 5);
     formatInvalid("( \t)", LdapErrorCode::InvalidSyntax, 3);
     formatted("( \nX=foo)", compact, "(X=foo)");
