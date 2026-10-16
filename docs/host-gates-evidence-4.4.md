@@ -51,6 +51,11 @@ El build parte de `f8607ac1d053c9cd67ce65e4a5bbde8ca9721fe6` más los cambios
 locales 4.4 de esta entrega; ese baseline por sí solo no identifica las fuentes
 modificadas. La revisión de integración se registra después de consolidar.
 
+Revisión consolidada de código y pruebas:
+`b7bc7e3682cb85eea8a8510c18a4f4048e922f54`. Las verificaciones de la
+continuación y las identidades de binarios anteriores corresponden a esas
+fuentes; el registro posterior de este identificador sólo modifica documentación.
+
 La matriz final de fuentes congeladas terminó con salida 0 para x86, x64 y
 ARM64, Release `/MT` y `/analyze`, sin advertencias observadas. Se leyeron
 independientemente las tres DLL; MZ/PE válidos y máquinas correspondientes:
